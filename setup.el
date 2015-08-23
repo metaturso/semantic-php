@@ -23,7 +23,13 @@
   This allows Semantic to known about symbols used in this buffer
   and defined in a different file."
 
-  (ede-php-autoload-find-class-def-file (ede-current-project) (semantic-tag-name tag)))
+  (let ((class-name (semantic-tag-name tag)))
+    (if (and (featurep 'ede-php-autoload) (ede-current-project))
+        (let ((file-name (ede-php-autoload-find-class-def-file (ede-current-project) class-name)))
+          (if file-name
+              file-name
+            class-name))
+      class-name)))
 
 (define-mode-local-override semantic-analyze-split-name php-mode (name)
   "Split up tag NAME into multiple parts by T_NS_SEPARATOR."
