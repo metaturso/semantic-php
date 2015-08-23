@@ -9,7 +9,7 @@
 ;; To allow you to M-x load-file setup.el and test this grammar
 ;; with a php buffer, I have added this load-path configuration:
 ;;
-(add-to-list 'load-path "./")
+(add-to-list 'load-path (file-name-directory (buffer-file-name)))
 
 ;;; Code:
 
