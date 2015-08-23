@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-23 16:36:05+0100
+;; Created: 2015-08-23 16:44:17+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -97,10 +97,8 @@
       (T_CONSTANT_ENCAPSED_STRING))
      ("string"
       (T_STRING))
-     ("float"
-      (T_DNUMBER))
-     ("integer"
-      (T_LNUMBER)))
+     ("number"
+      (T_NUMBER)))
    '(("keyword" :declared t)
      ("ns-separator" syntax "\\\\")
      ("ns-separator" matchdatatype regexp)
@@ -120,8 +118,7 @@
      ("quoted-string" :declared t)
      ("string" syntax "\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)")
      ("string" :declared t)
-     ("float" :declared t)
-     ("integer" :declared t)))
+     ("number" :declared t)))
   "Table of lexical tokens.")
 
 (defconst grammar--parse-table
@@ -129,7 +126,7 @@
     (eval-when-compile
       (require 'semantic/wisent/comp))
     (wisent-compile-grammar
-     '((T_LNUMBER T_DNUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK T_OPEN_TAG T_CLOSE_TAG T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_USE T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR)
+     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK T_OPEN_TAG T_CLOSE_TAG T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_USE T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR)
        nil
        (line
         ((T_SEMICOLON))
@@ -206,10 +203,8 @@
          (cons $3 $3))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
-        ((T_EQUAL T_LNUMBER)
-         (cons "integer" $2))
-        ((T_EQUAL T_DNUMBER)
-         (cons "float" $2)))
+        ((T_EQUAL T_NUMBER)
+         (cons "number" $2)))
        (method_declaration
         ((method_opt method_declarator method_body)
          (wisent-raw-tag
@@ -262,10 +257,8 @@
          (cons $3 $3))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
-        ((T_EQUAL T_LNUMBER)
-         (cons "integer" $2))
-        ((T_EQUAL T_DNUMBER)
-         (cons "float" $2)))
+        ((T_EQUAL T_NUMBER)
+         (cons "number" $2)))
        (access_modifier
         ((T_PUBLIC))
         ((T_PROTECTED))
@@ -361,6 +354,12 @@
   nil
   'mbstring)
 
+(define-lex-regex-type-analyzer grammar--<number>-regexp-analyzer
+  "regexp analyzer for <number> tokens."
+  semantic-lex-number-expression
+  nil
+  'T_NUMBER)
+
 (define-lex-regex-type-analyzer grammar--<ns-separator>-regexp-analyzer
   "regexp analyzer for <ns-separator> tokens."
   "\\\\"
@@ -411,6 +410,7 @@ It ignores whitespaces, newlines and comments."
   grammar--<punctuation>-string-analyzer
   grammar--<keyword>-keyword-analyzer
   grammar--<block>-block-analyzer
+  grammar--<number>-regexp-analyzer
   grammar--<string>-sexp-analyzer
   grammar--<quoted-string>-sexp-analyzer
   grammar--<mb>-regexp-analyzer)

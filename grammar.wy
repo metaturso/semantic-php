@@ -3,11 +3,8 @@
 
 %languagemode php-mode
 
-%type  <integer>
-%token <integer> T_LNUMBER
-
-%type  <float>
-%token <float> T_DNUMBER
+%type  <number>
+%token <number> T_NUMBER
 
 ;; the original regexp analyzer used in EDEP caused infinite loops for
 ;; all method names beginning with two underscores, e.e. __construct.
@@ -178,10 +175,8 @@ attribute_initialiser: ;; EMPTY
                        (cons $3 $3)
                      | T_EQUAL T_CONSTANT_ENCAPSED_STRING
                        (cons "string" $2)
-                     | T_EQUAL T_LNUMBER
-                       (cons "integer" $2)
-                     | T_EQUAL T_DNUMBER
-                       (cons "float" $2)
+                     | T_EQUAL T_NUMBER
+                       (cons "number" $2)
                      ;
 
 method_declaration: method_opt method_declarator method_body
@@ -231,10 +226,8 @@ formal_parameter_initialiser: ;; EMPTY
                               (cons $3 $3)
                             | T_EQUAL T_CONSTANT_ENCAPSED_STRING
                               (cons "string" $2)
-                            | T_EQUAL T_LNUMBER
-                              (cons "integer" $2)
-                            | T_EQUAL T_DNUMBER
-                              (cons "float" $2)
+                            | T_EQUAL T_NUMBER
+                              (cons "number" $2)
                             ;
 
 access_modifier: T_PUBLIC
@@ -319,6 +312,7 @@ It ignores whitespaces, newlines and comments."
   grammar--<punctuation>-string-analyzer
   grammar--<keyword>-keyword-analyzer
   grammar--<block>-block-analyzer
+  grammar--<number>-regexp-analyzer
   grammar--<string>-sexp-analyzer
   grammar--<quoted-string>-sexp-analyzer
   grammar--<mb>-regexp-analyzer)

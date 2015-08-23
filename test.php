@@ -11,7 +11,9 @@ class Bar
     private $string = 'helo'; // $string: string. Works
     private $partiallyQualified = new Partially\Qualified\Name(); // $partiallyQualified: Partially\Qualified\Name Works
     private $fullyQualified = new \Fully\Qualified\Name(); // $fullyQualified: Fully\Qualified\Name Works
-    // private $float = 1.1 // or $int = 1; crashes the parser
+    private $float = 1.1; // $float: number
+    private $int = 1; // $int: number
+    private $hex = 0xBADF00D;  // $hex: number
 
     public function __construct()
     {
