@@ -37,13 +37,24 @@ class Bar
     {
     }
 
-    protected function partiallyTypeHinted(Partially\Qualified\TypeHint $e)
+    private function partiallyTypeHinted(Partially\Qualified\TypeHint $typeHinted)
     {
     }
 
-    private function fullyTypeHinted(\Fully\Qualfied\TypeHint $e)
+    private function fullyTypeHinted(\Fully\Qualfied\TypeHint $fullyTypeHinted)
     {
+    }
 
+    private function defaultNullParameter($null = null)
+    {
+    }
+
+    private function defaultArrayParameter($param1, array $param2 = [], array $par)
+    {
+    }
+
+    private function defaultBooleanParameter($false = false, $true = true)
+    {
     }
 
     static public function publicStaticFunction()

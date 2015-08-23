@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-23 16:19:36+0100
+;; Created: 2015-08-23 16:36:05+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -195,7 +195,7 @@
         ((access_modifier)))
        (attribute_initialiser
         (nil
-         (cons "*uninitialised*" nil))
+         (cons "mixed" "*uninitialised*"))
         ((T_EQUAL T_NULL)
          (cons "null" nil))
         ((T_EQUAL boolean)
@@ -245,24 +245,33 @@
        (formal_parameter
         ((type T_VARIABLE formal_parameter_initialiser)
          (wisent-raw-tag
-          (semantic-tag-new-variable $2 $1
+          (semantic-tag-new-variable $2
+                                     (or $1
+                                         (car $3))
                                      (cdr $3)))))
        (formal_parameter_initialiser
         (nil
-         (identity "null"))
+         (cons "mixed" "*uninitialised*"))
+        ((T_EQUAL T_NULL)
+         (cons "null" nil))
+        ((T_EQUAL boolean)
+         (cons "boolean" $2))
         ((T_EQUAL BRACK_BLOCK)
-         (identity "[]"))
+         (cons "array" $2))
+        ((T_EQUAL T_NEW qualified_name)
+         (cons $3 $3))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
-         (identity $2))
-        ((T_EQUAL type_constant)
-         (identity $2)))
+         (cons "string" $2))
+        ((T_EQUAL T_LNUMBER)
+         (cons "integer" $2))
+        ((T_EQUAL T_DNUMBER)
+         (cons "float" $2)))
        (access_modifier
         ((T_PUBLIC))
         ((T_PROTECTED))
         ((T_PRIVATE)))
        (type
-        (nil
-         (identity "mixed"))
+        (nil)
         ((qualified_name))
         ((T_ARRAY)))
        (block

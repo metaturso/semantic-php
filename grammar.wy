@@ -167,7 +167,7 @@ attribute_opt: ;; EMPTY
              ;
 
 attribute_initialiser: ;; EMPTY
-                       (cons "*uninitialised*" nil)
+                       (cons "mixed" "*uninitialised*")
                      | T_EQUAL T_NULL
                        (cons "null" nil)
                      | T_EQUAL boolean
@@ -215,17 +215,26 @@ formal_parameters: LPAREN
                  ;
 
 formal_parameter: type T_VARIABLE formal_parameter_initialiser
-                  (VARIABLE-TAG $2 $1 (cdr $3))
+               ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
+                  (VARIABLE-TAG $2 (or $1 (car $3)) (cdr $3))
                 ;
 
 formal_parameter_initialiser: ;; EMPTY
-                              (identity "null")
+                              (cons "mixed" "*uninitialised*")
+                            | T_EQUAL T_NULL
+                              (cons "null" nil)
+                            | T_EQUAL boolean
+                              (cons "boolean" $2)
                             | T_EQUAL BRACK_BLOCK
-                              (identity "[]")
+                              (cons "array" $2)
+                            | T_EQUAL T_NEW qualified_name
+                              (cons $3 $3)
                             | T_EQUAL T_CONSTANT_ENCAPSED_STRING
-                              (identity $2)
-                            | T_EQUAL type_constant
-                              (identity $2)
+                              (cons "string" $2)
+                            | T_EQUAL T_LNUMBER
+                              (cons "integer" $2)
+                            | T_EQUAL T_DNUMBER
+                              (cons "float" $2)
                             ;
 
 access_modifier: T_PUBLIC
@@ -234,7 +243,6 @@ access_modifier: T_PUBLIC
                ;
 
 type: ;; EMPTY
-      (identity "mixed")
     | qualified_name
     | T_ARRAY
     ;
