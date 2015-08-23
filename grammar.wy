@@ -1,0 +1,316 @@
+%package grammar
+%provide grammar
+
+%languagemode php-mode
+
+%type  <integer>
+%token <integer> T_LNUMBER
+
+%type  <float>
+%token <float> T_DNUMBER
+
+;; the original regexp analyzer used in EDEP caused infinite loops for
+;; all method names beginning with two underscores, e.e. __construct.
+%type  <string> syntax "\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)" ;; should be regex, but sexp works okay.
+%token <string> T_STRING
+
+%type  <quoted-string> syntax "\\s\"" matchdatatype sexp
+%token <quoted-string> T_CONSTANT_ENCAPSED_STRING
+
+%type  <encapsed-and-whitespace>
+%token <encapsed-and-whitespace> T_ENCAPSED_AND_WHITESPACE
+
+%type  <variable> syntax "\\([$][a-zA-Z_]+[a-zA-Z0-9_]*\\)"
+%token <variable> T_VARIABLE
+
+%type  <mb> syntax "[[:nonascii:]]+"
+%token <mb> mbstring
+
+%type  <block>       ;;syntax "\\s(\\|\\s)" matchdatatype block
+%token <block>       PAREN_BLOCK "(LPAREN RPAREN)"
+%token <block>       BRACE_BLOCK "(LBRACE RBRACE)"
+%token <block>       BRACK_BLOCK "(LBRACK RBRACK)"
+
+%token <open-paren>  LPAREN      "("
+%token <close-paren> RPAREN      ")"
+%token <open-paren>  LBRACE      "{"
+%token <close-paren> RBRACE      "}"
+%token <open-paren>  LBRACK      "["
+%token <close-paren> RBRACK      "]"
+
+;; NOTE Open and closing tags are handled with ad-hoc analysers.
+;; While this won't make much difference now, it will enable us to
+;; write the logic to lex PHP fragments inside HTML files.
+%type  <code>
+%token <code>    T_OPEN_TAG             "<?php"
+%token <code>    T_CLOSE_TAG            "?>"
+
+%type  <punctuation> syntax "\\(\\s.\\|\\s$\\|\\s'\\|[$]\\|[\\]\\)+" matchdatatype string
+%token <punctuation> T_SEMICOLON ";"
+%token <punctuation> T_EQUAL     "="
+%token <punctuation> T_COMMA     ","
+%token <punctuation> T_SCOPE_RES "::"
+
+%type  <ns-separator> syntax "\\\\" matchdatatype regexp
+%token <ns-separator> T_NS_SEPARATOR
+
+%type <keyword>
+%keyword T_USE          "use"
+%keyword T_NULL         "null"
+%keyword T_TRUE         "true"
+%keyword T_FALSE        "false"
+%keyword T_NEW          "new"
+%keyword T_NAMESPACE    "namespace"
+%keyword T_CLASS        "class"
+%keyword T_ABSTRACT     "abstract"
+%keyword T_FINAL        "final"
+%keyword T_EXTENDS      "extends"
+%keyword T_IMPLEMENTS   "implements"
+%keyword T_PUBLIC       "public"
+%keyword T_PRIVATE      "private"
+%keyword T_PROTECTED    "protected"
+%keyword T_STATIC       "static"
+%keyword T_FUNCTION     "function"
+%keyword T_ARRAY        "array"
+%keyword T_VAR          "var"
+
+%start line
+
+%start qualified_name
+%start qualified_name_list
+
+%start class_declaration
+%start class_body
+%start class_opt
+%start extends_opt
+%start implements_opt
+%start class_member_declaration
+%start method_declaration
+%start method_declarator
+%start method_body
+%start method_opt
+%start formal_parameter
+%start formal_parameters
+%start formal_parameter_list
+%start formal_parameter_initialiser
+%start attribute_declaration
+%start attribute_opt
+%start attribute_initialiser
+%start type
+%start type_constant
+%start dims
+%start dims_opt
+%start block
+%start boolean
+%start use_declaration
+%start namespace_declaration
+
+%%
+
+line: T_SEMICOLON
+    | use_declaration
+    | namespace_declaration
+    | class_declaration
+    ;
+
+use_declaration: T_USE qualified_name T_SEMICOLON
+                 (INCLUDE-TAG $2 nil)
+               ;
+
+namespace_declaration: T_NAMESPACE qualified_name T_SEMICOLON
+                       (PACKAGE-TAG $2 nil)
+                     ;
+
+class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt class_body
+                   (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers $1)
+                 ;
+
+class_opt: ;; EMPTY
+         | T_ABSTRACT
+         | T_FINAL
+         ;
+
+extends_opt: ;;EMPTY
+           | T_EXTENDS qualified_name
+             (identity $2)
+           ;
+
+implements_opt: ;;EMPTY
+              | T_IMPLEMENTS qualified_name_list
+                (nreverse $2)
+              ;
+
+class_body: BRACE_BLOCK
+            (EXPANDFULL $1 class_member_declaration)
+          ;
+
+class_member_declaration: LBRACE
+                          ()
+                        | RBRACE
+                          ()
+                        | block
+                          ()
+                        | method_declaration
+                        | attribute_declaration
+                        ;
+
+attribute_declaration: attribute_opt T_VARIABLE attribute_initialiser
+                    ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
+                       (VARIABLE-TAG $2 (car $3) (cdr $3) :typemodifiers (list $1))
+                     ;
+
+attribute_opt: ;; EMPTY
+               (identity "public")
+             | T_VAR
+               (identity "public")
+             | access_modifier
+             ;
+
+attribute_initialiser: ;; EMPTY
+                       (cons "*uninitialised*" nil)
+                     | T_EQUAL T_NULL
+                       (cons "null" nil)
+                     | T_EQUAL boolean
+                       (cons "boolean" $2)
+                     | T_EQUAL BRACK_BLOCK
+                       (cons "array" $2)
+                     | T_EQUAL T_NEW qualified_name
+                       (cons $3 $3)
+                     | T_EQUAL T_CONSTANT_ENCAPSED_STRING
+                       (cons "string" $2)
+                     | T_EQUAL T_LNUMBER
+                       (cons "integer" $2)
+                     | T_EQUAL T_DNUMBER
+                       (cons "float" $2)
+                     ;
+
+method_declaration: method_opt method_declarator method_body
+                 ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
+                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers (list $1))
+                  ;
+
+method_declarator: T_FUNCTION T_STRING formal_parameter_list
+                   (cons $2 $3)
+                 ;
+
+method_opt: ;; EMPTY
+            (identity "public")
+          | access_modifier
+          ;
+
+method_body: T_SEMICOLON
+           | block
+           ;
+
+formal_parameter_list: PAREN_BLOCK
+                       (EXPANDFULL $1 formal_parameters)
+                     ;
+
+formal_parameters: LPAREN
+                   ()
+                 | RPAREN
+                   ()
+                 | formal_parameter T_COMMA
+                 | formal_parameter RPAREN
+                 ;
+
+formal_parameter: type T_VARIABLE formal_parameter_initialiser
+                  (VARIABLE-TAG $2 $1 (cdr $3))
+                ;
+
+formal_parameter_initialiser: ;; EMPTY
+                              (identity "null")
+                            | T_EQUAL BRACK_BLOCK
+                              (identity "[]")
+                            | T_EQUAL T_CONSTANT_ENCAPSED_STRING
+                              (identity $2)
+                            | T_EQUAL type_constant
+                              (identity $2)
+                            ;
+
+access_modifier: T_PUBLIC
+               | T_PROTECTED
+               | T_PRIVATE
+               ;
+
+type: ;; EMPTY
+      (identity "mixed")
+    | qualified_name
+    | T_ARRAY
+    ;
+
+block: BRACE_BLOCK
+     ;
+
+boolean: T_TRUE
+       | T_FALSE
+       ;
+
+type_constant: qualified_name T_SCOPE_RES T_STRING
+               (concat $1 $2 $3)
+             ;
+
+dims: dims BRACK_BLOCK
+      (concat $1 "[]")
+    | BRACK_BLOCK
+      (identity "[]")
+    ;
+
+dims_opt: ;;EMPTY
+          (identity "")
+        | dims
+        ;
+
+qualified_name: T_NS_SEPARATOR partial_qualified_name
+                (identity $2)
+              | partial_qualified_name
+              ;
+
+partial_qualified_name: partial_qualified_name T_NS_SEPARATOR T_STRING
+                        (concat $1 $2 $3)
+                      | T_STRING
+                      ;
+
+qualified_name_list: qualified_name_list T_COMMA qualified_name
+                     (cons $3 $1)
+                   | qualified_name
+                     (list $1)
+                   ;
+
+%%
+
+(define-lex-regex-analyzer grammar-lex-open-tag
+  "Detects and converts a php opening tag to a T_OPEN_TAG token"
+  "<[?]\\(php\\)?\\([[:space:]]+\\|$\\)"
+  ;; Zing to the end of this brace block.
+  (let ((start (match-beginning 0))
+        (end   (match-end 0)))
+    (semantic-lex-push-token
+     (semantic-lex-token 'T_OPEN_TAG start end))))
+
+(define-lex-regex-analyzer grammar-lex-close-tag
+  "Detects and converts a php closing tag to a T_CLOSE_TAG token"
+  "[?]>"
+  (let ((start (match-beginning 0))
+        (end   (match-end 0)))
+    (semantic-lex-push-token
+     (semantic-lex-token 'T_CLOSE_TAG start end))))
+
+(define-lex grammar-lexer
+  "Lexical analyzer that handles PHP buffers.
+It ignores whitespaces, newlines and comments."
+  semantic-lex-ignore-whitespace
+  semantic-lex-ignore-newline
+  semantic-lex-ignore-comments
+
+  grammar-lex-open-tag
+  grammar-lex-close-tag
+
+  grammar--<ns-separator>-regexp-analyzer
+  grammar--<variable>-regexp-analyzer
+  grammar--<punctuation>-string-analyzer
+  grammar--<keyword>-keyword-analyzer
+  grammar--<block>-block-analyzer
+  grammar--<string>-sexp-analyzer
+  grammar--<quoted-string>-sexp-analyzer
+  grammar--<mb>-regexp-analyzer)
