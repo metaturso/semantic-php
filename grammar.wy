@@ -83,8 +83,6 @@
 %start implements_opt
 %start class_member_declaration
 %start method_declaration
-%start method_declarator
-%start method_body
 %start method_opt
 %start formal_parameter
 %start formal_parameters
@@ -93,7 +91,7 @@
 %start attribute_declaration
 %start attribute_opt
 %start attribute_initialiser
-%start type
+%start type_hint
 %start type_constant
 %start dims
 %start dims_opt
@@ -101,6 +99,10 @@
 %start boolean
 %start use_declaration
 %start namespace_declaration
+%start class_instantiation
+%start function_declaration
+%start function_body
+%start function_declarator
 
 %%
 
@@ -108,17 +110,21 @@ line: T_SEMICOLON
     | use_declaration
     | namespace_declaration
     | class_declaration
+    | function_declaration
     ;
 
 use_declaration: T_USE qualified_name T_SEMICOLON
+              ;; NAME SYSTEM-FLAG &rest ATTRIBUTES
                  (INCLUDE-TAG $2 nil)
                ;
 
 namespace_declaration: T_NAMESPACE qualified_name T_SEMICOLON
+                    ;; NAME DETAIL &rest ATTRIBUTES
                        (PACKAGE-TAG $2 nil)
                      ;
 
 class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt class_body
+                ;;  NAME TYPE MEMBERS PARENTS &rest ATTRIBUTES
                    (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers $1)
                  ;
 
@@ -166,25 +172,34 @@ attribute_opt: ;; EMPTY
 attribute_initialiser: ;; EMPTY
                        (cons "mixed" "*uninitialised*")
                      | T_EQUAL T_NULL
-                       (cons "null" nil)
+                       (cons "null" "null")
                      | T_EQUAL boolean
                        (cons "boolean" $2)
                      | T_EQUAL BRACK_BLOCK
                        (cons "array" $2)
-                     | T_EQUAL T_NEW qualified_name
-                       (cons $3 $3)
+                     | T_EQUAL class_instantiation
+                       (cons $2 $2)
                      | T_EQUAL T_CONSTANT_ENCAPSED_STRING
                        (cons "string" $2)
                      | T_EQUAL T_NUMBER
                        (cons "number" $2)
                      ;
 
-method_declaration: method_opt method_declarator method_body
+class_instantiation: T_NEW qualified_name
+                     (identity $2)
+                   ;
+
+method_declaration: method_opt function_declarator function_body
                  ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers (list $1))
+                    (FUNCTION-TAG (car $2) "" (cdr $2) :typemodifiers (list $1))
                   ;
 
-method_declarator: T_FUNCTION T_STRING formal_parameter_list
+function_declaration: function_declarator function_body
+                   ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
+                    (FUNCTION-TAG (car $1) "mixed" (cdr $1))
+                    ;
+
+function_declarator: T_FUNCTION T_STRING formal_parameter_list
                    (cons $2 $3)
                  ;
 
@@ -193,9 +208,9 @@ method_opt: ;; EMPTY
           | access_modifier
           ;
 
-method_body: T_SEMICOLON
-           | block
-           ;
+function_body: T_SEMICOLON
+             | block
+             ;
 
 formal_parameter_list: PAREN_BLOCK
                        (EXPANDFULL $1 formal_parameters)
@@ -209,7 +224,7 @@ formal_parameters: LPAREN
                  | formal_parameter RPAREN
                  ;
 
-formal_parameter: type T_VARIABLE formal_parameter_initialiser
+formal_parameter: type_hint T_VARIABLE formal_parameter_initialiser
                ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
                   (VARIABLE-TAG $2 (or $1 (car $3)) (cdr $3))
                 ;
@@ -217,13 +232,11 @@ formal_parameter: type T_VARIABLE formal_parameter_initialiser
 formal_parameter_initialiser: ;; EMPTY
                               (cons "mixed" "*uninitialised*")
                             | T_EQUAL T_NULL
-                              (cons "null" nil)
+                              (cons "null" "null")
                             | T_EQUAL boolean
                               (cons "boolean" $2)
                             | T_EQUAL BRACK_BLOCK
                               (cons "array" $2)
-                            | T_EQUAL T_NEW qualified_name
-                              (cons $3 $3)
                             | T_EQUAL T_CONSTANT_ENCAPSED_STRING
                               (cons "string" $2)
                             | T_EQUAL T_NUMBER
@@ -235,10 +248,10 @@ access_modifier: T_PUBLIC
                | T_PRIVATE
                ;
 
-type: ;; EMPTY
-    | qualified_name
-    | T_ARRAY
-    ;
+type_hint: ;; EMPTY
+         | qualified_name
+         | T_ARRAY
+         ;
 
 block: BRACE_BLOCK
      ;

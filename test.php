@@ -2,6 +2,9 @@
 
 namespace Foo\Ns;
 
+use Foo\Bar\Baz;
+use RuntimeException;
+
 class Bar
 {
     public $pub;

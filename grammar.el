@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-23 16:44:17+0100
+;; Created: 2015-08-23 19:17:49+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -132,7 +132,8 @@
         ((T_SEMICOLON))
         ((use_declaration))
         ((namespace_declaration))
-        ((class_declaration)))
+        ((class_declaration))
+        ((function_declaration)))
        (use_declaration
         ((T_USE qualified_name T_SEMICOLON)
          (wisent-raw-tag
@@ -194,34 +195,44 @@
         (nil
          (cons "mixed" "*uninitialised*"))
         ((T_EQUAL T_NULL)
-         (cons "null" nil))
+         (cons "null" "null"))
         ((T_EQUAL boolean)
          (cons "boolean" $2))
         ((T_EQUAL BRACK_BLOCK)
          (cons "array" $2))
-        ((T_EQUAL T_NEW qualified_name)
-         (cons $3 $3))
+        ((T_EQUAL class_instantiation)
+         (cons $2 $2))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
         ((T_EQUAL T_NUMBER)
          (cons "number" $2)))
+       (class_instantiation
+        ((T_NEW qualified_name)
+         (identity $2)))
        (method_declaration
-        ((method_opt method_declarator method_body)
+        ((method_opt function_declarator function_body)
          (wisent-raw-tag
           (semantic-tag-new-function
            (car $2)
-           "mixed"
+           ""
            (cdr $2)
            :typemodifiers
            (list $1)))))
-       (method_declarator
+       (function_declaration
+        ((function_declarator function_body)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $1)
+           "mixed"
+           (cdr $1)))))
+       (function_declarator
         ((T_FUNCTION T_STRING formal_parameter_list)
          (cons $2 $3)))
        (method_opt
         (nil
          (identity "public"))
         ((access_modifier)))
-       (method_body
+       (function_body
         ((T_SEMICOLON))
         ((block)))
        (formal_parameter_list
@@ -238,7 +249,7 @@
         ((formal_parameter T_COMMA))
         ((formal_parameter RPAREN)))
        (formal_parameter
-        ((type T_VARIABLE formal_parameter_initialiser)
+        ((type_hint T_VARIABLE formal_parameter_initialiser)
          (wisent-raw-tag
           (semantic-tag-new-variable $2
                                      (or $1
@@ -248,13 +259,11 @@
         (nil
          (cons "mixed" "*uninitialised*"))
         ((T_EQUAL T_NULL)
-         (cons "null" nil))
+         (cons "null" "null"))
         ((T_EQUAL boolean)
          (cons "boolean" $2))
         ((T_EQUAL BRACK_BLOCK)
          (cons "array" $2))
-        ((T_EQUAL T_NEW qualified_name)
-         (cons $3 $3))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
         ((T_EQUAL T_NUMBER)
@@ -263,7 +272,7 @@
         ((T_PUBLIC))
         ((T_PROTECTED))
         ((T_PRIVATE)))
-       (type
+       (type_hint
         (nil)
         ((qualified_name))
         ((T_ARRAY)))
@@ -297,7 +306,7 @@
          (cons $3 $1))
         ((qualified_name)
          (list $1))))
-     '(line qualified_name qualified_name_list class_declaration class_body class_opt extends_opt implements_opt class_member_declaration method_declaration method_declarator method_body method_opt formal_parameter formal_parameters formal_parameter_list formal_parameter_initialiser attribute_declaration attribute_opt attribute_initialiser type type_constant dims dims_opt block boolean use_declaration namespace_declaration)))
+     '(line qualified_name qualified_name_list class_declaration class_body class_opt extends_opt implements_opt class_member_declaration method_declaration method_opt formal_parameter formal_parameters formal_parameter_list formal_parameter_initialiser attribute_declaration attribute_opt attribute_initialiser type_hint type_constant dims dims_opt block boolean use_declaration namespace_declaration class_instantiation function_declaration function_body function_declarator)))
   "Parser table.")
 
 (defun grammar--install-parser ()
