@@ -125,7 +125,7 @@ namespace_declaration: T_NAMESPACE qualified_name T_SEMICOLON
 
 class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt class_body
                 ;;  NAME TYPE MEMBERS PARENTS &rest ATTRIBUTES
-                   (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers $1)
+                   (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers (list $1))
                  ;
 
 class_opt: ;; EMPTY
