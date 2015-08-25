@@ -9,7 +9,7 @@
 ;; To allow you to M-x load-file setup.el and test this grammar
 ;; with a php buffer, I have added this load-path configuration:
 ;;
-(add-to-list 'load-path (file-name-directory (buffer-file-name)))
+(add-to-list 'load-path (file-name-directory load-file-name))
 
 ;;; Code:
 
@@ -92,6 +92,6 @@
 ;; have to refresh the Methods buffer with C-. r
 (add-hook 'php-mode-hook 'grammar-setup)
 
-(provide 'setup)
+(provide 'grammar-setup)
 
 ;;; setup.el ends here
