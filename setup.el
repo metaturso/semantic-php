@@ -16,11 +16,10 @@
 (require 'semantic/wisent)
 (require 'grammar)
 
-(defun semantic-php-init-parser-context ()
-  "Initialize context of the LR parser engine.
-Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols."
-  (message "Parsing a PHP buffer %s" semantic-php-init-parser-context)
-  (setq semantic-php-cache--namespaces nil))
+;; (defun semantic-php-init-parser-context ()
+;;   "Initialize context of the LR parser engine.
+;; Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols."
+;;   (setq semantic-php-cache--namespaces nil))
 
 ;; TODO: Handle file name resolution outside of ede-php-autoload projects.
 (define-mode-local-override semantic-tag-include-filename php-mode (tag)
@@ -51,7 +50,7 @@ Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols
 (defun grammar-setup ()
   "Setup a new grammar to process PHP buffers using Semantic."
 
-  (add-hook 'wisent-pre-parse-hook 'semantic-php-parser-context nil t)
+  ;; (add-hook 'wisent-pre-parse-hook 'semantic-php-parser-context nil t)
   (grammar--install-parser)
 
   (setq
@@ -68,7 +67,6 @@ Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols
    ;; Separators to use when finding context prefix
    semantic-type-relation-separator-character '("::" "->")
    semantic-command-separation-character ";"
-
 
    semantic-symbol->name-assoc-list-for-type-parts
    '((type     . "Classes")

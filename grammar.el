@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-23 19:17:49+0100
+;; Created: 2015-08-24 23:45:13+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -149,7 +149,8 @@
                                  (if
                                      (or $4 $5)
                                      (cons $4 $5))
-                                 :typemodifiers $1))))
+                                 :typemodifiers
+                                 (list $1)))))
        (class_opt
         (nil)
         ((T_ABSTRACT))
@@ -201,14 +202,17 @@
         ((T_EQUAL BRACK_BLOCK)
          (cons "array" $2))
         ((T_EQUAL class_instantiation)
-         (cons $2 $2))
+         (cons
+          (semantic-tag-name $2)
+          (semantic-tag-name $2)))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
         ((T_EQUAL T_NUMBER)
          (cons "number" $2)))
        (class_instantiation
         ((T_NEW qualified_name)
-         (identity $2)))
+         (wisent-raw-tag
+          (semantic-tag-new-include $2 nil))))
        (method_declaration
         ((method_opt function_declarator function_body)
          (wisent-raw-tag
