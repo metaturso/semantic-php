@@ -6,10 +6,6 @@
 ;; that extracts crucial information about the symbols defined and
 ;; used in a php buffer.
 ;;
-;; To allow you to M-x load-file setup.el and test this grammar
-;; with a php buffer, I have added this load-path configuration:
-;;
-(add-to-list 'load-path (file-name-directory load-file-name))
 
 ;;; Code:
 
