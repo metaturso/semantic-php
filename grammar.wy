@@ -43,6 +43,7 @@
 %token <code>    T_CLOSE_TAG            "?>"
 
 %type  <punctuation> syntax "\\(\\s.\\|\\s$\\|\\s'\\|[$]\\|[\\]\\)+" matchdatatype string
+%token <punctuation> T_COLON     ":"
 %token <punctuation> T_SEMICOLON ";"
 %token <punctuation> T_EQUAL     "="
 %token <punctuation> T_COMMA     ","
@@ -69,7 +70,15 @@
 %keyword T_STATIC       "static"
 %keyword T_FUNCTION     "function"
 %keyword T_ARRAY        "array"
-%keyword T_VAR          "var"
+%keyword T_VAR           "var"
+%keyword T_TYPE_ARRAY    "array"
+%keyword T_TYPE_INT      "int"
+%keyword T_TYPE_BOOL     "bool"
+%keyword T_TYPE_FLOAT    "float"
+%keyword T_TYPE_STRING   "string"
+%keyword T_TYPE_CALLABLE "callable"
+%keyword T_TYPE_SELF     "self"
+%keyword T_TYPE_PARENT   "parent"
 
 %start line
 
@@ -170,7 +179,7 @@ attribute_opt: ;; EMPTY
              ;
 
 attribute_initialiser: ;; EMPTY
-                       (cons "mixed" "*uninitialised*")
+                       (cons "mixed" "*undefined*")
                      | T_EQUAL T_NULL
                        (cons "null" "null")
                      | T_EQUAL boolean
@@ -191,17 +200,21 @@ class_instantiation: T_NEW qualified_name
 
 method_declaration: method_opt function_declarator function_body
                  ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                    (FUNCTION-TAG (car $2) "" (cdr $2) :typemodifiers (list $1))
+                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers (list $1))
+                  | method_opt function_declarator T_COLON method_return_type_hint function_body
+                    (FUNCTION-TAG (car $2) $4 (cdr $2) :typemodifiers (list $1))
                   ;
 
 function_declaration: function_declarator function_body
                    ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                    (FUNCTION-TAG (car $1) "mixed" (cdr $1))
+                      (FUNCTION-TAG (car $1) "mixed" (cdr $1))
+                    | function_declarator T_COLON function_return_type_hint function_body
+                      (FUNCTION-TAG (car $1) $3 (cdr $1))
                     ;
 
 function_declarator: T_FUNCTION T_STRING formal_parameter_list
-                   (cons $2 $3)
-                 ;
+                     (cons $2 $3)
+                   ;
 
 method_opt: ;; EMPTY
             (identity "public")
@@ -249,9 +262,25 @@ access_modifier: T_PUBLIC
                ;
 
 type_hint: ;; EMPTY
-         | qualified_name
-         | T_ARRAY
+         | required_type_hint
          ;
+
+function_return_type_hint: required_type_hint
+                         ;
+
+method_return_type_hint: required_type_hint
+                       | T_TYPE_SELF
+                       | T_TYPE_PARENT
+                       ;
+
+required_type_hint: T_TYPE_ARRAY
+                  | T_TYPE_INT
+                  | T_TYPE_BOOL
+                  | T_TYPE_FLOAT
+                  | T_TYPE_STRING
+                  | T_TYPE_CALLABLE
+                  | qualified_name
+                  ;
 
 block: BRACE_BLOCK
      ;

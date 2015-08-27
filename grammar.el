@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-24 23:45:13+0100
+;; Created: 2015-08-27 22:23:50+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -59,7 +59,15 @@
      ("static" . T_STATIC)
      ("function" . T_FUNCTION)
      ("array" . T_ARRAY)
-     ("var" . T_VAR))
+     ("var" . T_VAR)
+     ("array" . T_TYPE_ARRAY)
+     ("int" . T_TYPE_INT)
+     ("bool" . T_TYPE_BOOL)
+     ("float" . T_TYPE_FLOAT)
+     ("string" . T_TYPE_STRING)
+     ("callable" . T_TYPE_CALLABLE)
+     ("self" . T_TYPE_SELF)
+     ("parent" . T_TYPE_PARENT))
    'nil)
   "Table of language keywords.")
 
@@ -71,7 +79,8 @@
       (T_SCOPE_RES . "::")
       (T_COMMA . ",")
       (T_EQUAL . "=")
-      (T_SEMICOLON . ";"))
+      (T_SEMICOLON . ";")
+      (T_COLON . ":"))
      ("code"
       (T_CLOSE_TAG . "?>")
       (T_OPEN_TAG . "<?php"))
@@ -126,7 +135,7 @@
     (eval-when-compile
       (require 'semantic/wisent/comp))
     (wisent-compile-grammar
-     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK T_OPEN_TAG T_CLOSE_TAG T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_USE T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR)
+     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK T_OPEN_TAG T_CLOSE_TAG T_COLON T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_USE T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR T_TYPE_ARRAY T_TYPE_INT T_TYPE_BOOL T_TYPE_FLOAT T_TYPE_STRING T_TYPE_CALLABLE T_TYPE_SELF T_TYPE_PARENT)
        nil
        (line
         ((T_SEMICOLON))
@@ -194,7 +203,7 @@
         ((access_modifier)))
        (attribute_initialiser
         (nil
-         (cons "mixed" "*uninitialised*"))
+         (cons "mixed" "*undefined*"))
         ((T_EQUAL T_NULL)
          (cons "null" "null"))
         ((T_EQUAL boolean)
@@ -202,23 +211,28 @@
         ((T_EQUAL BRACK_BLOCK)
          (cons "array" $2))
         ((T_EQUAL class_instantiation)
-         (cons
-          (semantic-tag-name $2)
-          (semantic-tag-name $2)))
+         (cons $2 $2))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
         ((T_EQUAL T_NUMBER)
          (cons "number" $2)))
        (class_instantiation
         ((T_NEW qualified_name)
-         (wisent-raw-tag
-          (semantic-tag-new-include $2 nil))))
+         (identity $2)))
        (method_declaration
         ((method_opt function_declarator function_body)
          (wisent-raw-tag
           (semantic-tag-new-function
            (car $2)
-           ""
+           "mixed"
+           (cdr $2)
+           :typemodifiers
+           (list $1))))
+        ((method_opt function_declarator T_COLON method_return_type_hint function_body)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $2)
+           $4
            (cdr $2)
            :typemodifiers
            (list $1)))))
@@ -228,6 +242,12 @@
           (semantic-tag-new-function
            (car $1)
            "mixed"
+           (cdr $1))))
+        ((function_declarator T_COLON function_return_type_hint function_body)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $1)
+           $3
            (cdr $1)))))
        (function_declarator
         ((T_FUNCTION T_STRING formal_parameter_list)
@@ -278,8 +298,21 @@
         ((T_PRIVATE)))
        (type_hint
         (nil)
-        ((qualified_name))
-        ((T_ARRAY)))
+        ((required_type_hint)))
+       (function_return_type_hint
+        ((required_type_hint)))
+       (method_return_type_hint
+        ((required_type_hint))
+        ((T_TYPE_SELF))
+        ((T_TYPE_PARENT)))
+       (required_type_hint
+        ((T_TYPE_ARRAY))
+        ((T_TYPE_INT))
+        ((T_TYPE_BOOL))
+        ((T_TYPE_FLOAT))
+        ((T_TYPE_STRING))
+        ((T_TYPE_CALLABLE))
+        ((qualified_name)))
        (block
            ((BRACE_BLOCK)))
        (boolean
@@ -358,7 +391,8 @@
   '((T_SCOPE_RES . "::")
     (T_COMMA . ",")
     (T_EQUAL . "=")
-    (T_SEMICOLON . ";"))
+    (T_SEMICOLON . ";")
+    (T_COLON . ":"))
   'punctuation)
 
 (define-lex-regex-type-analyzer grammar--<mb>-regexp-analyzer
