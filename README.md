@@ -11,6 +11,22 @@ parser, and its use to write refactoring tools for PHP.  This is not a
 fully compliant PHP parser to check for parse errors, for that there's
 [flymake](http://www.emacswiki.org/emacs/FlymakePhp).
 
+## Usage
+
+To simplify testing a new prebuilt parser is provided with every
+commit. Download the source code somewhere in your filesystem and
+evaluate the following code in your `*scratch*` buffer to install a
+php-mode hook that will enable the parsing of PHP code:
+
+```lisp
+(add-to-list 'load-path "path/to/semantic-php")
+(require 'grammar-setup)
+```
+
+If you are using [Helm](https://github.com/emacs-helm/helm) the
+command `helm-semantic-or-imenu` is available to search and jump to
+the tags in the buffer, and it's normally bound to the key `C-x c i`.
+
 ## Dependencies
 
 - **Emacs 24+**
