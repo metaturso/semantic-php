@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-27 22:23:50+0100
+;; Created: 2015-08-31 20:14:35+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -73,9 +73,8 @@
 
 (defconst grammar--token-table
   (semantic-lex-make-type-table
-   '(("ns-separator"
-      (T_NS_SEPARATOR))
-     ("punctuation"
+   '(("punctuation"
+      (T_NS_SEPARATOR . "\\")
       (T_SCOPE_RES . "::")
       (T_COMMA . ",")
       (T_EQUAL . "=")
@@ -109,9 +108,6 @@
      ("number"
       (T_NUMBER)))
    '(("keyword" :declared t)
-     ("ns-separator" syntax "\\\\")
-     ("ns-separator" matchdatatype regexp)
-     ("ns-separator" :declared t)
      ("punctuation" syntax "\\(\\s.\\|\\s$\\|\\s'\\|[$]\\|[\\]\\)+")
      ("punctuation" matchdatatype string)
      ("punctuation" :declared t)
@@ -158,8 +154,7 @@
                                  (if
                                      (or $4 $5)
                                      (cons $4 $5))
-                                 :typemodifiers
-                                 (list $1)))))
+                                 :typemodifiers $1))))
        (class_opt
         (nil)
         ((T_ABSTRACT))
@@ -193,14 +188,13 @@
           (semantic-tag-new-variable $2
                                      (car $3)
                                      (cdr $3)
-                                     :typemodifiers
-                                     (list $1)))))
+                                     :typemodifiers $1))))
        (attribute_opt
         (nil
-         (identity "public"))
+         (list "public"))
         ((T_VAR)
-         (identity "public"))
-        ((access_modifier)))
+         (list "public"))
+        ((static_or_access_modifiers)))
        (attribute_initialiser
         (nil
          (cons "mixed" "*undefined*"))
@@ -254,8 +248,8 @@
          (cons $2 $3)))
        (method_opt
         (nil
-         (identity "public"))
-        ((access_modifier)))
+         (list "public"))
+        ((static_or_access_modifiers)))
        (function_body
         ((T_SEMICOLON))
         ((block)))
@@ -342,8 +336,15 @@
         ((qualified_name_list T_COMMA qualified_name)
          (cons $3 $1))
         ((qualified_name)
+         (list $1)))
+       (static_or_access_modifiers
+        ((access_modifier T_STATIC)
+         (list $2 $1))
+        ((T_STATIC access_modifier)
+         (list $1 $2))
+        ((access_modifier)
          (list $1))))
-     '(line qualified_name qualified_name_list class_declaration class_body class_opt extends_opt implements_opt class_member_declaration method_declaration method_opt formal_parameter formal_parameters formal_parameter_list formal_parameter_initialiser attribute_declaration attribute_opt attribute_initialiser type_hint type_constant dims dims_opt block boolean use_declaration namespace_declaration class_instantiation function_declaration function_body function_declarator)))
+     '(line qualified_name qualified_name_list class_declaration class_body class_opt extends_opt implements_opt class_member_declaration method_declaration method_opt formal_parameter formal_parameters formal_parameter_list formal_parameter_initialiser attribute_declaration attribute_opt attribute_initialiser type_hint type_constant dims dims_opt block boolean use_declaration namespace_declaration class_instantiation function_declaration function_body function_declarator static_or_access_modifiers)))
   "Parser table.")
 
 (defun grammar--install-parser ()
@@ -388,7 +389,8 @@
 (define-lex-string-type-analyzer grammar--<punctuation>-string-analyzer
   "string analyzer for <punctuation> tokens."
   "\\(\\s.\\|\\s$\\|\\s'\\|[$]\\|[\\]\\)+"
-  '((T_SCOPE_RES . "::")
+  '((T_NS_SEPARATOR . "\\")
+    (T_SCOPE_RES . "::")
     (T_COMMA . ",")
     (T_EQUAL . "=")
     (T_SEMICOLON . ";")
@@ -406,12 +408,6 @@
   semantic-lex-number-expression
   nil
   'T_NUMBER)
-
-(define-lex-regex-type-analyzer grammar--<ns-separator>-regexp-analyzer
-  "regexp analyzer for <ns-separator> tokens."
-  "\\\\"
-  nil
-  'T_NS_SEPARATOR)
 
 (define-lex-sexp-type-analyzer grammar--<string>-sexp-analyzer
   "sexp analyzer for <string> tokens."
@@ -452,7 +448,6 @@ It ignores whitespaces, newlines and comments."
   grammar-lex-open-tag
   grammar-lex-close-tag
 
-  grammar--<ns-separator>-regexp-analyzer
   grammar--<variable>-regexp-analyzer
   grammar--<punctuation>-string-analyzer
   grammar--<keyword>-keyword-analyzer

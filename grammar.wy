@@ -43,33 +43,31 @@
 %token <code>    T_CLOSE_TAG            "?>"
 
 %type  <punctuation> syntax "\\(\\s.\\|\\s$\\|\\s'\\|[$]\\|[\\]\\)+" matchdatatype string
-%token <punctuation> T_COLON     ":"
-%token <punctuation> T_SEMICOLON ";"
-%token <punctuation> T_EQUAL     "="
-%token <punctuation> T_COMMA     ","
-%token <punctuation> T_SCOPE_RES "::"
-
-%type  <ns-separator> syntax "\\\\" matchdatatype regexp
-%token <ns-separator> T_NS_SEPARATOR
+%token <punctuation> T_COLON        ":"
+%token <punctuation> T_SEMICOLON    ";"
+%token <punctuation> T_EQUAL        "="
+%token <punctuation> T_COMMA        ","
+%token <punctuation> T_SCOPE_RES    "::"
+%token <punctuation> T_NS_SEPARATOR "\\"
 
 %type <keyword>
-%keyword T_USE          "use"
-%keyword T_NULL         "null"
-%keyword T_TRUE         "true"
-%keyword T_FALSE        "false"
-%keyword T_NEW          "new"
-%keyword T_NAMESPACE    "namespace"
-%keyword T_CLASS        "class"
-%keyword T_ABSTRACT     "abstract"
-%keyword T_FINAL        "final"
-%keyword T_EXTENDS      "extends"
-%keyword T_IMPLEMENTS   "implements"
-%keyword T_PUBLIC       "public"
-%keyword T_PRIVATE      "private"
-%keyword T_PROTECTED    "protected"
-%keyword T_STATIC       "static"
-%keyword T_FUNCTION     "function"
-%keyword T_ARRAY        "array"
+%keyword T_USE           "use"
+%keyword T_NULL          "null"
+%keyword T_TRUE          "true"
+%keyword T_FALSE         "false"
+%keyword T_NEW           "new"
+%keyword T_NAMESPACE     "namespace"
+%keyword T_CLASS         "class"
+%keyword T_ABSTRACT      "abstract"
+%keyword T_FINAL         "final"
+%keyword T_EXTENDS       "extends"
+%keyword T_IMPLEMENTS    "implements"
+%keyword T_PUBLIC        "public"
+%keyword T_PRIVATE       "private"
+%keyword T_PROTECTED     "protected"
+%keyword T_STATIC        "static"
+%keyword T_FUNCTION      "function"
+%keyword T_ARRAY         "array"
 %keyword T_VAR           "var"
 %keyword T_TYPE_ARRAY    "array"
 %keyword T_TYPE_INT      "int"
@@ -112,6 +110,7 @@
 %start function_declaration
 %start function_body
 %start function_declarator
+%start static_or_access_modifiers
 
 %%
 
@@ -134,7 +133,7 @@ namespace_declaration: T_NAMESPACE qualified_name T_SEMICOLON
 
 class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt class_body
                 ;;  NAME TYPE MEMBERS PARENTS &rest ATTRIBUTES
-                   (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers (list $1))
+                   (TYPE-TAG $3 $2 $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers $1)
                  ;
 
 class_opt: ;; EMPTY
@@ -168,14 +167,14 @@ class_member_declaration: LBRACE
 
 attribute_declaration: attribute_opt T_VARIABLE attribute_initialiser
                     ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
-                       (VARIABLE-TAG $2 (car $3) (cdr $3) :typemodifiers (list $1))
+                       (VARIABLE-TAG $2 (car $3) (cdr $3) :typemodifiers $1)
                      ;
 
 attribute_opt: ;; EMPTY
-               (identity "public")
+               (list "public")
              | T_VAR
-               (identity "public")
-             | access_modifier
+               (list "public")
+             | static_or_access_modifiers
              ;
 
 attribute_initialiser: ;; EMPTY
@@ -217,8 +216,8 @@ function_declarator: T_FUNCTION T_STRING formal_parameter_list
                    ;
 
 method_opt: ;; EMPTY
-            (identity "public")
-          | access_modifier
+            (list "public")
+          | static_or_access_modifiers
           ;
 
 function_body: T_SEMICOLON
@@ -320,6 +319,14 @@ qualified_name_list: qualified_name_list T_COMMA qualified_name
                      (list $1)
                    ;
 
+static_or_access_modifiers: access_modifier T_STATIC
+                            (list $2 $1)
+                          | T_STATIC access_modifier
+                            (list $1 $2)
+                          | access_modifier
+                            (list $1)
+                          ;
+
 %%
 
 (define-lex-regex-analyzer grammar-lex-open-tag
@@ -349,7 +356,6 @@ It ignores whitespaces, newlines and comments."
   grammar-lex-open-tag
   grammar-lex-close-tag
 
-  grammar--<ns-separator>-regexp-analyzer
   grammar--<variable>-regexp-analyzer
   grammar--<punctuation>-string-analyzer
   grammar--<keyword>-keyword-analyzer
