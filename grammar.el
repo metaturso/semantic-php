@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2015 Andrea Turso
 
-;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2015-08-31 20:14:35+0100
+;; Author: Andrea Turso <trashofmasters@gmail.com>
+;; Created: 2015-09-13 16:27:45+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -157,8 +157,10 @@
                                  :typemodifiers $1))))
        (class_opt
         (nil)
-        ((T_ABSTRACT))
-        ((T_FINAL)))
+        ((T_ABSTRACT)
+         (list "abstract"))
+        ((T_FINAL)
+         (list "final")))
        (extends_opt
         (nil)
         ((T_EXTENDS qualified_name)

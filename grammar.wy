@@ -138,7 +138,9 @@ class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt c
 
 class_opt: ;; EMPTY
          | T_ABSTRACT
+           (list "abstract")
          | T_FINAL
+           (list "final")
          ;
 
 extends_opt: ;;EMPTY
