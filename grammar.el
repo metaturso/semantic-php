@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-09-13 16:27:45+0100
+;; Created: 2015-10-23 13:08:39+0100
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -222,16 +222,14 @@
            (car $2)
            "mixed"
            (cdr $2)
-           :typemodifiers
-           (list $1))))
+           :typemodifiers $1)))
         ((method_opt function_declarator T_COLON method_return_type_hint function_body)
          (wisent-raw-tag
           (semantic-tag-new-function
            (car $2)
            $4
            (cdr $2)
-           :typemodifiers
-           (list $1)))))
+           :typemodifiers $1))))
        (function_declaration
         ((function_declarator function_body)
          (wisent-raw-tag

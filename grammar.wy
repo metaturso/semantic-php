@@ -201,9 +201,9 @@ class_instantiation: T_NEW qualified_name
 
 method_declaration: method_opt function_declarator function_body
                  ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers (list $1))
+                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers $1)
                   | method_opt function_declarator T_COLON method_return_type_hint function_body
-                    (FUNCTION-TAG (car $2) $4 (cdr $2) :typemodifiers (list $1))
+                    (FUNCTION-TAG (car $2) $4 (cdr $2) :typemodifiers $1)
                   ;
 
 function_declaration: function_declarator function_body
