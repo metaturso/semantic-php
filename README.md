@@ -31,7 +31,7 @@ the tags in the buffer, and it's normally bound to the key `C-x c i`.
 
 - **Emacs 24+**
 
-- [**php-mode**](github.com/ejmr/php-mode)
+- [**php-mode**](https://github.com/ejmr/php-mode)
 
 	This projects adds behaviour to PHP mode, so this is a necessary
 requirement.
