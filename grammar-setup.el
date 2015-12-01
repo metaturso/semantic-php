@@ -12,6 +12,8 @@
 (require 'semantic/wisent)
 (require 'grammar)
 
+(define-child-mode php-mode nil)
+
 ;; (defun semantic-php-init-parser-context ()
 ;;   "Initialize context of the LR parser engine.
 ;; Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols."
@@ -43,40 +45,97 @@
   "Reassembles the components of NAMELIST into a qualified name."
   (mapconcat 'identity namelist "\\"))
 
+(define-mode-local-override semantic-ctxt-imported-packages php-mode (&optional point)
+  ""
+  (when point (goto-char point))
+  ;; (setq tmp (semantic-find-tags-by-class 'using (current-buffer)))
+  ;; (dolist (T tmp) (setq namereturn (cons (semantic-tag-type T) namereturn)))
+  (let ((parent-tag (car (cdr (nreverse (semantic-find-tag-by-overlay))))))
+    (remq nil (list "\\"
+                    (when (string-equal "namespace" (semantic-tag-type parent-tag))
+                      (semantic-tag-name parent-tag))))))
+
+(define-mode-local-override semantic-find-tags-included php-mode (&optional table)
+  "Find all tags in TABLE that are namespaces or of the 'include and class.
+TABLE is a tag table.  See `semantic-something-to-tag-table'."
+  (unless table (setq table (current-buffer)))
+  (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
+
+  ;; (let ((tags (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
+  ;;       (namespaces (semantic-find-tags-by-type "namespace" table)))
+  ;;   (dolist (cur namespaces)
+  ;;     (setq tags
+  ;;           (append tags
+  ;;       	    (semantic-find-tags-by-class
+  ;;       	     'include
+  ;;       	     (semantic-tag-get-attribute cur :members)))))
+  ;;   tags))
+
+;; canonic tag name
+;; start with \\<tag_name>
+;; parent? \\<parent_name>\\<tag_name>
+;; parent? \\<parent_name>\\<parent_name>\\<tag_name>
+(defun semantic-php-name-nonnamespace (name)
+  "Returns the non-namespace part of NAME."
+  (car (last (split-string name "\\\\"))))
+
+(defun semantic-php-tag-expand (tag)
+  ""
+  (when (semantic-tag-of-class-p tag 'using)
+    ;; TODO use split name function to return the cell
+    ;; (namespace . symbol-name).
+    (let* ((using-tag tag)
+           (type-tag (semantic-tag-get-attribute using-tag :type))
+           (qualified-name (semantic-tag-name type-tag))
+           (symbol-name (semantic-php-name-nonnamespace qualified-name))
+           (symbol-alias (semantic-tag-name using-tag))
+           (include-tag (semantic-tag-new-include qualified-name nil)))
+
+      ;; Change the name of the using tag to be the local name
+      ;; of the imported class, or its alias.
+      ;;
+      ;; NOTE We could split qualified names (namespace . symbol) in
+      ;; the grammar or using the semantic-analyze-split-name
+      ;; function.
+      (if (string-equal symbol-name symbol-alias)
+          (semantic-tag-set-name using-tag symbol-alias)
+        (semantic-tag-set-name using-tag symbol-name))
+      (semantic-tag-set-bounds include-tag (semantic-tag-start using-tag) (semantic-tag-end using-tag))
+      (list using-tag include-tag))))
+
+;;;###autoload
 (defun grammar-setup ()
   "Setup a new grammar to process PHP buffers using Semantic."
 
-  ;; (add-hook 'wisent-pre-parse-hook 'semantic-php-parser-context nil t)
   (grammar--install-parser)
 
-  (setq
-   ;; Lexical analysis
-   semantic-lex-analyzer 'grammar-lexer
+  (setq semantic-tag-expand-function 'semantic-php-tag-expand)
+  (setq semantic-lex-analyzer #'grammar-lexer)
 
-   ;; Semantic requires this expression for line-comments, if lexing
-   ;; without major mode.
-   semantic-lex-comment-regex "\\s<\\|\\(/\\*\\|//\\)"
+  ;; TODO: Don't ignore comment to allow docblock to scan types?
+  ;; Separators to use when finding context prefix
+  (setq parse-sexp-ignore-comments t
+        semantic-type-relation-separator-character '("::" "->" "\\")
+        semantic-command-separation-character ";")
 
-   ;; TODO: Don't ignore comment to allow docblock to scan types.
-   parse-sexp-ignore-comments t
+  (setq semanticdb-find-default-throttle
+        '(file unloaded system omniscience))
 
-   ;; Separators to use when finding context prefix
-   semantic-type-relation-separator-character '("::" "->")
-   semantic-command-separation-character ";"
+  (setq semantic-symbol->name-assoc-list-for-type-parts
+        '((type     . "Classes")
+          (variable . "Attributes")
+          (function . "Methods")
+          (using    . "Using")
+          (include  . "Imports")))
 
-   semantic-symbol->name-assoc-list-for-type-parts
-   '((type     . "Classes")
-     (variable . "Attributes")
-     (function . "Methods"))
-   semantic-symbol->name-assoc-list
-
-   (append semantic-symbol->name-assoc-list-for-type-parts
-           '((package  . "In this pacakge")  ;; TODO add symbols in the same namespace
-             (include  . "Imported packages")))
+   (setq semantic-symbol->name-assoc-list
+         '((package  . "Provides")
+           (using    . "Using")
+           (include  . "Imports")))
 
    ;; navigation inside 'type children
-   senator-step-at-tag-classes '(function variable type)
-   semanticdb-find-default-throttle)
+   (setq senator-step-at-tag-classes '(function variable type)
+         semanticdb-find-default-throttle)
   (semantic-mode 1))
 
 ;; Hooks the semantic-php grammar to php-mode.

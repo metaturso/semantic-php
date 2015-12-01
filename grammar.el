@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-10-23 13:08:39+0100
+;; Created: 2015-12-07 20:25:37+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -42,7 +42,9 @@
 ;;
 (defconst grammar--keyword-table
   (semantic-lex-make-keyword-table
-   '(("use" . T_USE)
+   '(("as" . T_AS)
+     ("use" . T_USE)
+     ("const" . T_CONST)
      ("null" . T_NULL)
      ("true" . T_TRUE)
      ("false" . T_FALSE)
@@ -80,9 +82,15 @@
       (T_EQUAL . "=")
       (T_SEMICOLON . ";")
       (T_COLON . ":"))
+     ("scope"
+      (S_NS_SCOPE))
      ("code"
-      (T_CLOSE_TAG . "?>")
-      (T_OPEN_TAG . "<?php"))
+      (T_CLOSE_TAG . "[?]\\>")
+      (T_OPEN_TAG . "\\<[?]\\(php\\)?"))
+     ("block"
+      (BRACK_BLOCK . "(LBRACK RBRACK)")
+      (BRACE_BLOCK . "(LBRACE RBRACE)")
+      (PAREN_BLOCK . "(LPAREN RPAREN)"))
      ("close-paren"
       (RBRACK . "]")
       (RBRACE . "}")
@@ -91,10 +99,6 @@
       (LBRACK . "[")
       (LBRACE . "{")
       (LPAREN . "("))
-     ("block"
-      (BRACK_BLOCK . "(LBRACK RBRACK)")
-      (BRACE_BLOCK . "(LBRACE RBRACE)")
-      (PAREN_BLOCK . "(LPAREN RPAREN)"))
      ("mb"
       (mbstring))
      ("variable"
@@ -115,13 +119,13 @@
      ("block" :declared t)
      ("mb" syntax "[[:nonascii:]]+")
      ("mb" :declared t)
-     ("variable" syntax "\\([$][a-zA-Z_]+[a-zA-Z0-9_]*\\)")
+     ("variable" syntax "[$]\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)")
      ("variable" :declared t)
      ("encapsed-and-whitespace" :declared t)
      ("quoted-string" syntax "\\s\"")
      ("quoted-string" matchdatatype sexp)
      ("quoted-string" :declared t)
-     ("string" syntax "\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)")
+     ("string" syntax "\\([A-z_]+[A-z0-9_]*\\)")
      ("string" :declared t)
      ("number" :declared t)))
   "Table of lexical tokens.")
@@ -131,26 +135,87 @@
     (eval-when-compile
       (require 'semantic/wisent/comp))
     (wisent-compile-grammar
-     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK T_OPEN_TAG T_CLOSE_TAG T_COLON T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_USE T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR T_TYPE_ARRAY T_TYPE_INT T_TYPE_BOOL T_TYPE_FLOAT T_TYPE_STRING T_TYPE_CALLABLE T_TYPE_SELF T_TYPE_PARENT)
+     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK T_OPEN_TAG T_CLOSE_TAG S_NS_SCOPE T_COLON T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_AS T_USE T_CONST T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR T_TYPE_ARRAY T_TYPE_INT T_TYPE_BOOL T_TYPE_FLOAT T_TYPE_STRING T_TYPE_CALLABLE T_TYPE_SELF T_TYPE_PARENT)
        nil
-       (line
-        ((T_SEMICOLON))
-        ((use_declaration))
+       (grammar
         ((namespace_declaration))
+        ((class_declaration))
+        ((use_declaration))
+        ((function_declaration)))
+       (namespace_declaration
+        ((T_NAMESPACE qualified_name namespace_body)
+         (let
+             ((namespace
+               (wisent-raw-tag
+                (semantic-tag-new-type $2 "namespace" nil nil)))
+              members)
+           (dolist
+               (tag $3 members)
+             (if
+                 (memq
+                  (semantic-tag-class tag)
+                  '(include using namespace))
+                 (setq members
+                       (cons
+                        (semantic-tag-put-attribute tag :namespace $2)
+                        members))
+               (setq members
+                     (cons tag members))))
+           (semantic-tag-put-attribute namespace :members
+                                       (nreverse members))
+           namespace)))
+       (namespace_body
+        ((S_NS_SCOPE)
+         (if $region1
+             (semantic-parse-region
+              (car $region1)
+              (cdr $region1)
+              'namespace_subparts nil)
+           (error "Invalid form (EXPANDFULL %s %s)" $region1 'namespace_subparts)))
+        ((BRACE_BLOCK)
+         (semantic-parse-region
+          (car $region1)
+          (cdr $region1)
+          'namespace_subparts 1)))
+       (namespace_subparts
+        (nil nil)
+        ((T_SEMICOLON)
+         nil)
+        ((use_declaration))
         ((class_declaration))
         ((function_declaration)))
        (use_declaration
-        ((T_USE qualified_name T_SEMICOLON)
+        ((T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON)
          (wisent-raw-tag
-          (semantic-tag-new-include $2 nil))))
-       (namespace_declaration
-        ((T_NAMESPACE qualified_name T_SEMICOLON)
+          (semantic-tag $5 'using :type
+                        (wisent-raw-tag
+                         (semantic-tag-new-type $3 $2
+                                                (list
+                                                 (wisent-raw-tag
+                                                  (semantic-tag-new-type $5 $2 nil nil))
+                                                 :kind 'alias)
+                                                nil)))))
+        ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
-          (semantic-tag-new-package $2 nil))))
+          (semantic-tag $3 'using :type
+                        (wisent-raw-tag
+                         (semantic-tag-new-type $3 $2
+                                                (list
+                                                 (wisent-raw-tag
+                                                  (semantic-tag-new-type $3 $2 nil nil))
+                                                 :kind 'alias)
+                                                nil))))))
+       (use_type
+        ((T_CONST)
+         (identity "variable"))
+        ((T_FUNCTION)
+         (identity "function"))
+        (nil
+         (identity "class")))
        (class_declaration
         ((class_opt T_CLASS qualified_name extends_opt implements_opt class_body)
          (wisent-raw-tag
-          (semantic-tag-new-type $3 $2 $6
+          (semantic-tag-new-type $3 "class" $6
                                  (if
                                      (or $4 $5)
                                      (cons $4 $5))
@@ -247,8 +312,6 @@
         ((T_FUNCTION T_STRING formal_parameter_list)
          (cons $2 $3)))
        (method_opt
-        (nil
-         (list "public"))
         ((static_or_access_modifiers)))
        (function_body
         ((T_SEMICOLON))
@@ -312,26 +375,16 @@
        (boolean
         ((T_TRUE))
         ((T_FALSE)))
-       (type_constant
-        ((qualified_name T_SCOPE_RES T_STRING)
-         (concat $1 $2 $3)))
-       (dims
-        ((dims BRACK_BLOCK)
-         (concat $1 "[]"))
-        ((BRACK_BLOCK)
-         (identity "[]")))
-       (dims_opt
-        (nil
-         (identity ""))
-        ((dims)))
        (qualified_name
         ((T_NS_SEPARATOR partial_qualified_name)
-         (identity $2))
-        ((partial_qualified_name)))
+         (identity "\\" $2))
+        ((partial_qualified_name)
+         (identity $1)))
        (partial_qualified_name
         ((partial_qualified_name T_NS_SEPARATOR T_STRING)
-         (concat $1 $2 $3))
-        ((T_STRING)))
+         (concat $1 "\\" $3))
+        ((T_STRING)
+         (identity $1)))
        (qualified_name_list
         ((qualified_name_list T_COMMA qualified_name)
          (cons $3 $1))
@@ -344,7 +397,7 @@
          (list $1 $2))
         ((access_modifier)
          (list $1))))
-     '(line qualified_name qualified_name_list class_declaration class_body class_opt extends_opt implements_opt class_member_declaration method_declaration method_opt formal_parameter formal_parameters formal_parameter_list formal_parameter_initialiser attribute_declaration attribute_opt attribute_initialiser type_hint type_constant dims dims_opt block boolean use_declaration namespace_declaration class_instantiation function_declaration function_body function_declarator static_or_access_modifiers)))
+     '(grammar formal_parameters namespace_subparts class_member_declaration)))
   "Parser table.")
 
 (defun grammar--install-parser ()
@@ -371,7 +424,7 @@
 
 (define-lex-regex-type-analyzer grammar--<variable>-regexp-analyzer
   "regexp analyzer for <variable> tokens."
-  "\\([$][a-zA-Z_]+[a-zA-Z0-9_]*\\)"
+  "[$]\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)"
   nil
   'T_VARIABLE)
 
@@ -411,7 +464,7 @@
 
 (define-lex-sexp-type-analyzer grammar--<string>-sexp-analyzer
   "sexp analyzer for <string> tokens."
-  "\\([a-zA-Z_]+[a-zA-Z0-9_]*\\)"
+  "\\([A-z_]+[A-z0-9_]*\\)"
   'T_STRING)
 
 (define-lex-keyword-type-analyzer grammar--<keyword>-keyword-analyzer
@@ -424,7 +477,6 @@
 (define-lex-regex-analyzer grammar-lex-open-tag
   "Detects and converts a php opening tag to a T_OPEN_TAG token"
   "<[?]\\(php\\)?\\([[:space:]]+\\|$\\)"
-  ;; Zing to the end of this brace block.
   (let ((start (match-beginning 0))
         (end   (match-end 0)))
     (semantic-lex-push-token
@@ -438,18 +490,47 @@
     (semantic-lex-push-token
      (semantic-lex-token 'T_CLOSE_TAG start end))))
 
+(define-lex-analyzer grammar-lex-ns-block
+  "Detects namespace blocks enclosed with non-braced namespace
+declarations."
+  (looking-at "^namespace .+;")
+
+  (semantic-lex-push-token
+   (semantic-lex-token
+    'T_NAMESPACE
+    (match-beginning 0)
+    (+ (match-beginning 0) (length "namespace"))))
+
+  (semantic-lex-push-token
+   (semantic-lex-token
+    'T_STRING
+    (+ 1 (match-beginning 0) (length "namespace"))
+    (1- (match-end 0))))
+
+  (search-forward ";")
+
+  (semantic-lex-push-token
+   (semantic-lex-token
+    'S_NS_SCOPE
+    (match-end 0)
+    (save-excursion
+      (semantic-lex-unterminated-syntax-protection 'S_NS_SCOPE
+        (re-search-forward "^namespace .+;\\|\\'")
+        (setq semantic-lex-end-point (point))
+        (match-beginning 0)))))
+  nil)
+
 (define-lex grammar-lexer
   "Lexical analyzer that handles PHP buffers.
 It ignores whitespaces, newlines and comments."
-  semantic-lex-ignore-whitespace
-  semantic-lex-ignore-newline
-  semantic-lex-ignore-comments
-
   grammar-lex-open-tag
   grammar-lex-close-tag
-
+  semantic-lex-ignore-newline
+  semantic-lex-ignore-whitespace
+  semantic-lex-ignore-comments
   grammar--<variable>-regexp-analyzer
   grammar--<punctuation>-string-analyzer
+  grammar-lex-ns-block
   grammar--<keyword>-keyword-analyzer
   grammar--<block>-block-analyzer
   grammar--<number>-regexp-analyzer

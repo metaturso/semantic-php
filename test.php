@@ -5,7 +5,15 @@ namespace Foo\Ns;
 use Foo\Bar\Baz;
 use RuntimeException;
 
-class Bar
+class DateTime
+{
+    public function format()
+    {
+        return '';
+    }
+}
+
+class TestClass
 {
     public $pub;
     private $pri;
@@ -20,10 +28,26 @@ class Bar
 
     public function __construct()
     {
+        // (company-semantic-completions "$this->")
+        // (company-semantic "$this->" "")
     }
 
     function impliedPublicMethod()
     {
+        // (semantic-up-context) takes you between ) {
+        if (true) {
+            $list = [];
+            $this->publicMethod();
+            $date = new \DateTime();
+
+            foreach ($list as $index => $value) {
+                if ($index == 1) {
+                    // (semantic-beginning-of-context) takes you to {
+                    // (semantic-end-of-scope) takes you to }
+                    // (semantic-narrow-to-context) also works
+                }
+            }
+        }
     }
 
     public function publicMethod()
@@ -56,6 +80,7 @@ class Bar
 
     private function defaultArrayParameter($param1, array $param2 = [], array $par)
     {
+        $this->
     }
 
     private function defaultBooleanParameter($false = false, $true = true)
