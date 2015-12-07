@@ -1,17 +1,12 @@
 <?php
 
-namespace Foo\Bar;
+namespace FirstNs;
 
 use DateTime;
-use Carbon\Carbon as CarbonDate;
+use Carbon\Carbon as Another;
 
-/**
- * Helo
- */
 class SomeClass
 {
-    // (pp (semantic-find-tags-included nil))
-    // (semantic-something-to-tag-table (current-buffer))
     public function __construct()
     {
     }

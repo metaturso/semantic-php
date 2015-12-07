@@ -1,18 +1,35 @@
 <?php
-
-namespace Foo;
+/**
+ * Useful debugging commands
+ *
+ * (pp (semantic-find-tags-included))
+ *
+ * Some of Semantic relies on this search returning tags, therefore
+ * it's important that it works: (semantic-find-tags-by-class 'include
+ * (current-buffer))
+ *
+ * That's a macro that relies on:
+ * (semantic-flatten-tags-table (current-buffer))
+ *
+ * (dolist (tag (semantic-flatten-tags-table (current-buffer)))
+ *   (message "tag: %s, class: %s" (semantic-tag-name tag) (semantic-tag-class tag)))
+ *
+ * (pp (semantic-fetch-tags))
+ * (progn (goto-char (point-min)) (pp (bovinate)))
+ *
+ * (dolist (tag (semantic-fetch-tags))
+ *  (when (eq 'using (semantic-tag-class tag)) (pp tag)))
+ */
+namespace FirstNs;
 
 use External;
-use External\Another as Abaca;
+use External\Another as AnotherAliased;
 use const Math\Pi as Pie;
 use function Math\Sin;
+use Carbon\Carbon;
 
 function hello()
 {
-    // (pp (semantic-find-tags-included (current-buffer)))
-    // (semantic-find-tags-by-class 'include (current-buffer))
-    // (dolist (tag (semantic-flatten-tags-table (current-buffer))) (message "tag: %s, class: %s" (semantic-tag-name tag) (semantic-tag-class tag)))
-    // (dolist (T tmp) (setq namereturn (cons (semantic-tag-type T) namereturn)))
 }
 
 class ClassName
@@ -29,9 +46,9 @@ class ClassName
     }
 }
 
-namespace C;
+namespace SecondNs;
 
-use Foo;
+use External\AnotherOneStill;
 
 class AnotherClass
 {
@@ -48,25 +65,4 @@ class AnotherClass
     }
 }
 
-// (pp (semantic-fetch-tags))
-// (bovinate)
-
-// (dolist (tag (semantic-fetch-tags))
-//  (when (eq 'using (semantic-tag-class tag)) (pp tag)))
-// namespace Braced;
-
-// (semantic-find-tags-by-class 'class)
-// (semantic-find-tags-by-class 'package)
-
-// (semantic-parse-region (point-min) (point-max) 'top_level 0 t)
-// (semantic-parse-region (point-min) (point-max) 'namespace_brace_context 0 t)
-// (semantic-parse-region (point-min) (point-max) 'brace_namespace_declaration 0 t)
-//
-// (semantic-parse-region (point-min) (point-max) 'namespace_semicolon_context 0 t)
-// (semantic-parse-region (point-min) (point-max) 'semicolon_namespace_declaration 0 t)
-
-namespace ANother;
-
-class UnderAnother
-{
-}
+namespace ThirdNs;
