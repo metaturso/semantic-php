@@ -45,6 +45,16 @@
   "Reassembles the components of NAMELIST into a qualified name."
   (mapconcat 'identity namelist "\\"))
 
+(define-mode-local-override semantic-ctxt-scoped-types php-mode (&optional point)
+  ""
+  ;; TODO filter types to those imported in the current namespace only
+  ;; or keep this information buffer-wise?
+  (let* ((table (current-buffer))
+         (tags (semantic-find-tags-by-class 'using (semantic-flatten-tags-table table)))
+         scoped-types)
+    (dolist (tag tags scoped-types)
+      (push (semantic-tag-name tag) scoped-types))))
+
 (define-mode-local-override semantic-ctxt-imported-packages php-mode (&optional point)
   ""
   (when point (goto-char point))
@@ -60,16 +70,6 @@
 TABLE is a tag table.  See `semantic-something-to-tag-table'."
   (unless table (setq table (current-buffer)))
   (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
-
-  ;; (let ((tags (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
-  ;;       (namespaces (semantic-find-tags-by-type "namespace" table)))
-  ;;   (dolist (cur namespaces)
-  ;;     (setq tags
-  ;;           (append tags
-  ;;       	    (semantic-find-tags-by-class
-  ;;       	     'include
-  ;;       	     (semantic-tag-get-attribute cur :members)))))
-  ;;   tags))
 
 ;; canonic tag name
 ;; start with \\<tag_name>

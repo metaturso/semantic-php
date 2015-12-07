@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-12-07 20:25:37+0000
+;; Created: 2015-12-07 22:06:32+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -193,7 +193,7 @@
                                                 (list
                                                  (wisent-raw-tag
                                                   (semantic-tag-new-type $5 $2 nil nil))
-                                                 :kind 'alias)
+                                                 nil :kind 'alias :prototype t)
                                                 nil)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
@@ -203,7 +203,7 @@
                                                 (list
                                                  (wisent-raw-tag
                                                   (semantic-tag-new-type $3 $2 nil nil))
-                                                 :kind 'alias)
+                                                 nil :kind 'alias :prototype t)
                                                 nil))))))
        (use_type
         ((T_CONST)

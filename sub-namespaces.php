@@ -2,7 +2,7 @@
 /**
  * Useful debugging commands
  *
- * (pp (semantic-find-tags-included))
+ * (pp (semantic-find-tags-included (current-buffer)))
  *
  * Some of Semantic relies on this search returning tags, therefore
  * it's important that it works: (semantic-find-tags-by-class 'include
@@ -19,6 +19,8 @@
  *
  * (dolist (tag (semantic-fetch-tags))
  *  (when (eq 'using (semantic-tag-class tag)) (pp tag)))
+ *
+ * (semantic-analyze-scoped-types (point))
  */
 namespace FirstNs;
 

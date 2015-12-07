@@ -163,9 +163,9 @@ namespace_subparts: ;; EMPTY
 ;; know it must be a namespace.
 use_declaration:
     T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
-    (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $5 $2 nil nil) :kind 'alias) nil))
+    (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $5 $2 nil nil) nil :kind 'alias :prototype t) nil))
   | T_USE use_type qualified_name T_SEMICOLON
-    (TAG $3 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil) :kind 'alias) nil))
+    (TAG $3 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil) nil :kind 'alias :prototype t) nil))
   ;
 
 use_type:
