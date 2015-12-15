@@ -87,8 +87,7 @@ TABLE is a tag table.  See `semantic-something-to-tag-table'."
     (let* ((using-tag tag)
            (type-tag (semantic-tag-get-attribute using-tag :type))
            (qualified-name (semantic-tag-name type-tag))
-           (symbol-name (semantic-php-name-nonnamespace qualified-name))
-           (symbol-alias (semantic-tag-name using-tag))
+           (symbol-alias (semantic-php-name-nonnamespace (semantic-tag-name using-tag)))
            (include-tag (semantic-tag-new-include qualified-name nil)))
 
       ;; Change the name of the using tag to be the local name
@@ -97,9 +96,8 @@ TABLE is a tag table.  See `semantic-something-to-tag-table'."
       ;; NOTE We could split qualified names (namespace . symbol) in
       ;; the grammar or using the semantic-analyze-split-name
       ;; function.
-      (if (string-equal symbol-name symbol-alias)
-          (semantic-tag-set-name using-tag symbol-alias)
-        (semantic-tag-set-name using-tag symbol-name))
+      (semantic-tag-set-name using-tag symbol-alias)
+
       (semantic-tag-set-bounds include-tag (semantic-tag-start using-tag) (semantic-tag-end using-tag))
       (list using-tag include-tag))))
 

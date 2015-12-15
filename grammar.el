@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2015 Andrea Turso
 
-;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-12-07 22:06:32+0000
+;; Author: Andrea Turso <andreaturso@proxima>
+;; Created: 2015-12-15 23:53:53+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -192,9 +192,8 @@
                          (semantic-tag-new-type $3 $2
                                                 (list
                                                  (wisent-raw-tag
-                                                  (semantic-tag-new-type $5 $2 nil nil))
-                                                 nil :kind 'alias :prototype t)
-                                                nil)))))
+                                                  (semantic-tag-new-type $5 $2 nil nil)))
+                                                nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
           (semantic-tag $3 'using :type
@@ -202,9 +201,8 @@
                          (semantic-tag-new-type $3 $2
                                                 (list
                                                  (wisent-raw-tag
-                                                  (semantic-tag-new-type $3 $2 nil nil))
-                                                 nil :kind 'alias :prototype t)
-                                                nil))))))
+                                                  (semantic-tag-new-type $3 $2 nil nil)))
+                                                nil :kind 'alias :prototype t))))))
        (use_type
         ((T_CONST)
          (identity "variable"))
