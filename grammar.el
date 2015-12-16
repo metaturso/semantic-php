@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2015 Andrea Turso
 
-;; Author: Andrea Turso <andreaturso@proxima>
-;; Created: 2015-12-15 23:53:53+0000
+;; Author: Andrea Turso <trashofmasters@gmail.com>
+;; Created: 2015-12-16 03:26:15+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -142,6 +142,25 @@
         ((class_declaration))
         ((use_declaration))
         ((function_declaration)))
+       (local_variables
+        ((T_VARIABLE local_variable_initialiser)
+         (wisent-raw-tag
+          (semantic-tag-new-variable $1
+                                     (car $2)
+                                     (cdr $2)))))
+       (local_variable_initialiser
+        ((T_EQUAL T_NULL)
+         (cons "null" "null"))
+        ((T_EQUAL boolean)
+         (cons "boolean" $2))
+        ((T_EQUAL BRACK_BLOCK)
+         (cons "array" $2))
+        ((T_EQUAL class_instantiation)
+         (cons $2 $2))
+        ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
+         (cons "string" $2))
+        ((T_EQUAL T_NUMBER)
+         (cons "number" $2)))
        (namespace_declaration
         ((T_NAMESPACE qualified_name namespace_body)
          (let
@@ -192,7 +211,7 @@
                          (semantic-tag-new-type $3 $2
                                                 (list
                                                  (wisent-raw-tag
-                                                  (semantic-tag-new-type $5 $2 nil nil)))
+                                                  (semantic-tag-new-type $3 $2 nil nil)))
                                                 nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
@@ -269,8 +288,6 @@
          (cons "boolean" $2))
         ((T_EQUAL BRACK_BLOCK)
          (cons "array" $2))
-        ((T_EQUAL class_instantiation)
-         (cons $2 $2))
         ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
          (cons "string" $2))
         ((T_EQUAL T_NUMBER)
@@ -395,7 +412,7 @@
          (list $1 $2))
         ((access_modifier)
          (list $1))))
-     '(grammar formal_parameters namespace_subparts class_member_declaration)))
+     '(grammar formal_parameters namespace_subparts class_member_declaration local_variables)))
   "Parser table.")
 
 (defun grammar--install-parser ()

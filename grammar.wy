@@ -81,7 +81,8 @@
 %keyword T_TYPE_SELF     "self"
 %keyword T_TYPE_PARENT   "parent"
 
-;; start nonterminal for bovine-toplevel
+;; Internally the first start nonterminal is targeted by the reserved
+;; symbol bovine-toplevel, so it can be found by the parser harness.
 %start grammar
 
 ;; nonterminals used with EXPANDFULL
@@ -91,13 +92,46 @@
 
 ;; reparse nonterminals
 
+;; local_variables is used instead of bovine-inner-scope to extract
+;; tags from blocks of code.
+;;
+;; NOTE AFAIK it's still impossible to use %scopestart in a Wisent
+;; grammar to specify which nonterminal should be handled as
+;; bovine-inner-scope.
+;;
+;; This nonterminal is used to parse blocks of code in
+;; semantic-get-local-variables.
+%start local_variables
+
 %%
 
+;; bovine-top-level
 grammar: namespace_declaration
        | class_declaration
        | use_declaration
        | function_declaration
        ;
+
+;; bovine-inner-scope
+local_variables:
+    T_VARIABLE local_variable_initialiser
+    (VARIABLE-TAG $1 (car $2) (cdr $2))
+  ;
+
+local_variable_initialiser:
+    T_EQUAL T_NULL
+    (cons "null" "null")
+  | T_EQUAL boolean
+    (cons "boolean" $2)
+  | T_EQUAL BRACK_BLOCK
+    (cons "array" $2)
+  | T_EQUAL class_instantiation
+    (cons $2 $2)
+  | T_EQUAL T_CONSTANT_ENCAPSED_STRING
+    (cons "string" $2)
+  | T_EQUAL T_NUMBER
+    (cons "number" $2)
+  ;
 
 namespace_declaration:
     T_NAMESPACE qualified_name namespace_body
