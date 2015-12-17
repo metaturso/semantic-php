@@ -12,20 +12,12 @@
 (require 'semantic/wisent)
 (require 'grammar)
 
-(define-child-mode php-mode nil)
-
-;; (defun semantic-php-init-parser-context ()
-;;   "Initialize context of the LR parser engine.
-;; Used as a local `wisent-pre-parse-hook' to cleanup the stack of imported symbols."
-;;   (setq semantic-php-cache--namespaces nil))
-
 ;; TODO: Handle file name resolution outside of ede-php-autoload projects.
 (define-mode-local-override semantic-tag-include-filename php-mode (tag)
   "Maps a PHP qualified class name to a file.
 
   This allows Semantic to known about symbols used in this buffer
   and defined in a different file."
-
   (let ((class-name (semantic-tag-name tag)))
     (if (and (featurep 'ede-php-autoload) (ede-current-project))
         (let ((file-name (ede-php-autoload-find-class-def-file (ede-current-project) class-name)))
@@ -45,38 +37,58 @@
   "Reassembles the components of NAMELIST into a qualified name."
   (mapconcat 'identity namelist "\\"))
 
-(define-mode-local-override semantic-ctxt-scoped-types php-mode (&optional point)
-  ""
-  ;; TODO filter types to those imported in the current namespace only
-  ;; or keep this information buffer-wise?
-  (let* ((table (current-buffer))
-         (tags (semantic-find-tags-by-class 'using (semantic-flatten-tags-table table)))
-         scoped-types)
-    (dolist (tag tags scoped-types)
-      (push (semantic-tag-name tag) scoped-types))))
+(define-mode-local-override semanticdb-find-table-for-include php-mode (includetag &optional table)
+  "For a single INCLUDETAG found in TABLE, find a `semanticdb-table' object
+INCLUDETAG is a semantic TAG of class 'include.
+TABLE is a semanticdb table that identifies where INCLUDETAG came from.
+TABLE is optional if INCLUDETAG has an overlay of :filename attribute."
+  ;; Generic way of looking up a class.
+  ;;
+  ;; Are we in the same namespace or package?
+  ;; If we are in a namespace, does the namespace part of the include
+  ;; match the current namespace? If yes we might be able to find our
+  ;; way around the file system without knowing anything else, elthough
+  ;; we should rely on ede.
+  (if (and (featurep 'ede-php-autoload) (ede-current-project))
+      (semantic-file-tag-table (ede-php-autoload-find-class-def-file (ede-current-project) (car includetag)))))
 
-(define-mode-local-override semantic-ctxt-imported-packages php-mode (&optional point)
-  ""
-  (message "Imported pckage analysis")
+(define-mode-local-override semantic-ctxt-scoped-types php-mode (&optional point)
+  "Return a list of type names currently in scope at POINT.
+The return value can be a mixed list of either strings (names of
+types that are in scope) or actual tags (type declared locally
+that may or may not have a name.)"
+  ;; 1. all types imported with using
+  ;; 2. all types in the same namespace
+  ;; 3. all types declared in the same buffer (and namespace scope as 2)
   (save-excursion
     (when point (goto-char point))
-    (let ((parent-tag (car (cdr (nreverse (semantic-find-tag-by-overlay)))))
-          (aliased-names (semantic-find-tags-by-class 'using (semantic-flatten-tags-table (current-buffer)))))
-      (pp aliased-names)
-      (remq nil (list "\\"
-                      ;; all using statements are implied packages
-                      ;; TODO limit this to S_NS_SCOPE at point.
+    (let* ((top-level (semantic-find-tag-by-overlay))
+           (parent-tag (car (cdr (nreverse top-level))))
+           ;; NOTE this line assumes top-level is always a namespace.
+           ;;
+           ;; I have considered always providing a top-level
+           ;; namespace, but decided not to walk that route just yet.
+           ;;
+           ;; The next change I'll be making here is probably
+           ;; improving the top-level initialisation code above.
+           (imported-types (semantic-find-tags-by-class 'using (semantic-flatten-tags-table top-level)))
+           scoped-types)
 
-                      ;; the current namespace is an implied package
-                      (when (string-equal "namespace" (semantic-tag-type parent-tag))
-                        (semantic-tag-name parent-tag)))))))
+      ;; 1. all types imported with using
+      (setq scoped-types (mapcar 'semantic-tag-type imported-types))
 
-(define-mode-local-override semantic-ctxt-scoped-types php-mode (&optional point)
-  ""
-  nil)
+      ;; 2. all types in the same namespace.
+      ;; TODO I think this will need a lookup.
 
+      ;; 3. TODO
+      scoped-types)))
+
+;; TODO I need to investigate why %scopestart fails to provide
+;; bovine-inner-scope so that semantic-get-all-local-variables-default
+;; can work with a simple get-local-variables.
 (define-mode-local-override semantic-get-local-variables php-mode (&optional point)
-  ""
+  "Get the local variables based on POINT's context.
+Local variables are returned in Semantic tag format."
   ;; Disable parsing messages
   (let ((semantic--progress-reporter nil))
     (save-excursion
@@ -92,18 +104,21 @@
           (save-excursion
             (forward-char 1)
 
-            ;; Check if we're in a method.
             (setq parent-tag (semantic-tag-calculate-parent (semantic-current-tag)))
+
+            ;; Check if we're in a method.
             (when (and parent-tag
                        (semantic-tag-of-class-p parent-tag 'type)
-                       (member (semantic-tag-type parent-tag) '("class" "interface")))
+                       (member (semantic-tag-type parent-tag) '("class" "interface" "trait")))
+
               (push (semantic-tag-new-variable "$this" parent-tag) vars)
               (push (semantic-tag-new-variable "static" parent-tag) vars)
               (push (semantic-tag-new-variable "self" parent-tag) vars)
-              (push (semantic-tag-new-variable "parent" (car (semantic-tag-type-superclasses parent-tag))) vars)
-              (message "In method"))
 
-            ;; TODO handle cached variables.
+              (when (semantic-tag-type-superclasses parent-tag)
+                (push (semantic-tag-new-variable "parent" (car (semantic-tag-type-superclasses parent-tag))) vars)))
+
+            ;; TODO these tags probably all need :filename
             (setq vars (append
                         (semantic-parse-region (point)
                                                (save-excursion (semantic-end-of-context) (point))
@@ -111,6 +126,7 @@
                                                nil
                                                t)
                         vars))))
+
         ;; (message "Parsed variables [first useful start %d]" firstusefulstart)
         ;; (pp vars)
         ;; Hash our value into the first context that produced useful results.
@@ -120,7 +136,7 @@
                        (save-excursion
                          (unless (semantic-end-of-context)
                            (point))))))
-            (message "Caching values %d->%d." firstusefulstart end)
+            ;; (message "Caching values %d->%d." firstusefulstart end)
             (semantic-cache-data-to-buffer
              (current-buffer) firstusefulstart
              (or end
@@ -136,12 +152,17 @@
 (define-mode-local-override semantic-find-tags-included php-mode (&optional table)
   "Find all tags in TABLE that are namespaces or of the 'include and class.
 TABLE is a tag table.  See `semantic-something-to-tag-table'."
+  ;; TODO limit to current 'scope'
   (unless table (setq table (current-buffer)))
   (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
 
 (defun semantic-php-name-nonnamespace (name)
   "Returns the non-namespace part of NAME."
   (car (last (split-string name "\\\\"))))
+
+(defun semantic-php-name-fully-qualified-p (name)
+  ""
+  (equal "\\" (substring name 0 1)))
 
 (defun semantic-php-tag-expand (tag)
   ""
