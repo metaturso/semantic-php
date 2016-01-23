@@ -61,6 +61,7 @@
 %keyword T_NEW           "new"
 %keyword T_NAMESPACE     "namespace"
 %keyword T_CLASS         "class"
+%keyword T_INTERFACE     "interface"
 %keyword T_ABSTRACT      "abstract"
 %keyword T_FINAL         "final"
 %keyword T_EXTENDS       "extends"
@@ -89,6 +90,7 @@
 %start formal_parameters
 %start namespace_subparts
 %start class_member_declaration
+%start interface_member_declaration
 
 ;; reparse nonterminals
 
@@ -106,16 +108,25 @@
 %%
 
 ;; bovine-top-level
-grammar: namespace_declaration
-       | class_declaration
-       | use_declaration
-       | function_declaration
-       ;
+;; NOTE: Remember to keep namespace_subparts
+grammar:
+    namespace_declaration
+  | use_declaration
+  | class_declaration
+  | function_declaration
+  | interface_declaration
+  ;
 
 ;; bovine-inner-scope
 local_variables:
     T_VARIABLE local_variable_initialiser
-    (VARIABLE-TAG $1 (car $2) (cdr $2))
+ ;; NOTE experimenting with variable typing. Now I'm using an alias to
+ ;; inform Semantic the type of this variable is some other tag.
+ ;;
+ ;; TODO figure out the difference between name and definition of an
+ ;; alias tag.
+ ;; (VARIABLE-TAG $1 (ALIAS-TAG (car $2) 'using nil) (cdr $2))
+    (VARIABLE-TAG $1 (TAG (car $2) 'metatype) (cdr $2))
   ;
 
 local_variable_initialiser:
@@ -143,8 +154,8 @@ namespace_declaration:
  ;; the namespace type tag ecb-sync-tags breaks, probably because of
  ;; circular references in the data.
  ;;
- ;; TODO Exclude variables with nil :constant-flag.
- ;; TODO Macro.
+ ;; TODO Don't export non-constants, i.e. variables with nil :constant-flag.
+ ;; TODO Extract Wisent Macro.
     (let ((namespace (TYPE-TAG $2 "namespace" nil nil)) members)
       (dolist (tag $3 members)
         ;; Don't add the namespace name to the include, namespace and
@@ -178,15 +189,16 @@ namespace_body:
     (EXPANDFULL $1 namespace_subparts)
   ;
 
-namespace_subparts: ;; EMPTY
-                    ()
-                  | T_SEMICOLON
-                    ()
-                  | use_declaration
-                  | class_declaration
-                  | function_declaration
-                 ;; | const_declaration
-                  ;
+namespace_subparts:
+ ;; EMPTY
+    ()
+  | T_SEMICOLON
+    ()
+  | use_declaration
+  | class_declaration
+  | function_declaration
+  | interface_declaration
+  ;
 
 ;; In PHP we want the use declarations to behave both as the definition
 ;; of a new symbol and as an include statement.
@@ -195,11 +207,18 @@ namespace_subparts: ;; EMPTY
 ;; time but it's easy to determine with a call to the filesystem when
 ;; a directory can be found matching qualified symbol name, then we
 ;; know it must be a namespace.
+;;
+;; Structure of the generated tag:
+;;
+;; (USING imported-type-name :type (TYPE fq-type-name (TYPE fq-type-name*)))
+;;
+;; *Q: At this point I'm not sure how useful is to redeclare TYPE as a
+;; member of TYPE, but I'll keep it for consistency with C++.
 use_declaration:
     T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
     (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   | T_USE use_type qualified_name T_SEMICOLON
-    (TAG $3 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   ;
 
 use_type:
@@ -211,7 +230,7 @@ use_type:
     (identity "class") ;; TODO: or namespace if directory.
   ;
 
-class_declaration: class_opt T_CLASS qualified_name extends_opt implements_opt class_body
+class_declaration: class_opt T_CLASS T_STRING extends_opt implements_opt class_body
                 ;;  NAME TYPE MEMBERS PARENTS &rest ATTRIBUTES
                    (TYPE-TAG $3 "class" $6 (if (or $4 $5) (cons $4 $5)) :typemodifiers $1)
                  ;
@@ -237,30 +256,33 @@ class_body: BRACE_BLOCK
             (EXPANDFULL $1 class_member_declaration)
           ;
 
-class_member_declaration: LBRACE
-                          ()
-                        | RBRACE
-                          ()
-                        | block
-                          ()
-                        | method_declaration
-                        | attribute_declaration
-                        ;
+class_member_declaration:
+    LBRACE
+    ()
+  | RBRACE
+    ()
+  | block
+    ()
+  | method_declaration
+  | attribute_declaration
+  ;
 
 attribute_declaration: attribute_opt T_VARIABLE attribute_initialiser
                     ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
                        (VARIABLE-TAG $2 (car $3) (cdr $3) :typemodifiers $1)
                      ;
 
-attribute_opt: ;; EMPTY
-               (list "public")
-             | T_VAR
-               (list "public")
-             | static_or_access_modifiers
-             ;
+attribute_opt:
+ ;; EMPTY
+    (list "public")
+ ;; PHP4 class property
+  | T_VAR
+    (list "public")
+  | static_or_access_modifiers
+  ;
 
 attribute_initialiser: ;; EMPTY
-                       (cons "mixed" "*undefined*")
+                       (cons "mixed" "*empty*")
                      | T_EQUAL T_NULL
                        (cons "null" "null")
                      | T_EQUAL boolean
@@ -277,25 +299,26 @@ class_instantiation: T_NEW qualified_name
                      (identity $2)
                    ;
 
-method_declaration: method_opt function_declarator function_body
-                 ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers $1)
-                  | method_opt function_declarator T_COLON method_return_type_hint function_body
-                    (FUNCTION-TAG (car $2) $4 (cdr $2) :typemodifiers $1)
+method_declaration:
+    method_opt function_declarator T_COLON method_return_type_hint function_body
+    (FUNCTION-TAG (car $2) (TAG $4 'metatype) (cdr $2) :typemodifiers $1)
+  | method_opt function_declarator function_body
+    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers $1)
                   ;
 
-function_declaration: function_declarator function_body
-                   ;; NAME TYPE ARG-LIST &rest ATTRIBUTES
-                      (FUNCTION-TAG (car $1) "mixed" (cdr $1))
-                    | function_declarator T_COLON function_return_type_hint function_body
-                      (FUNCTION-TAG (car $1) $3 (cdr $1))
-                    ;
+function_declaration:
+    function_declarator T_COLON function_return_type_hint function_body
+    (FUNCTION-TAG (car $1) (TAG $3 'metatype) (cdr $1))
+  | function_declarator function_body
+    (FUNCTION-TAG (car $1) "mixed" (cdr $1))
+  ;
 
 function_declarator: T_FUNCTION T_STRING formal_parameter_list
                      (cons $2 $3)
                    ;
 
-;; NOTE Don't fallback to public to distinguish from a function.
+;; NOTE Don't use public visibility by default as this creates
+;; ambiguity with functions.
 method_opt: static_or_access_modifiers
           ;
 
@@ -316,12 +339,11 @@ formal_parameters: LPAREN
                  ;
 
 formal_parameter: type_hint T_VARIABLE formal_parameter_initialiser
-               ;; NAME TYPE DEFAULT-VALUE &rest ATTRIBUTES
-                  (VARIABLE-TAG $2 (or $1 (car $3)) (cdr $3))
+                  (VARIABLE-TAG $2 (TAG (or $1 (car $3)) 'metatype) (cdr $3))
                 ;
 
 formal_parameter_initialiser: ;; EMPTY
-                              (cons "mixed" "*uninitialised*")
+                              (cons "mixed" "*empty*")
                             | T_EQUAL T_NULL
                               (cons "null" "null")
                             | T_EQUAL boolean
@@ -339,12 +361,14 @@ access_modifier: T_PUBLIC
                | T_PRIVATE
                ;
 
-type_hint: ;; EMPTY
-         | required_type_hint
-         ;
+type_hint:
+ ;; EMPTY
+  | required_type_hint
+  ;
 
-function_return_type_hint: required_type_hint
-                         ;
+function_return_type_hint:
+    required_type_hint
+  ;
 
 method_return_type_hint: required_type_hint
                        | T_TYPE_SELF
@@ -383,7 +407,7 @@ boolean: T_TRUE
 ;;         ;
 
 qualified_name: T_NS_SEPARATOR partial_qualified_name
-                (identity "\\" $2)
+                (concat "\\" $2)
               | partial_qualified_name
                 (identity $1)
               ;
@@ -400,13 +424,43 @@ qualified_name_list: qualified_name_list T_COMMA qualified_name
                      (list $1)
                    ;
 
-static_or_access_modifiers: access_modifier T_STATIC
-                            (list $2 $1)
-                          | T_STATIC access_modifier
-                            (list $1 $2)
-                          | access_modifier
-                            (list $1)
-                          ;
+static_or_access_modifiers:
+    T_STATIC access_modifier
+    (list $1 $2)
+  | access_modifier T_STATIC
+    (list $2 $1)
+  | access_modifier
+    (list $1)
+  ;
+
+;; Temporary interface support I need for testing inline completion of
+;; type members.
+interface_declaration:
+    T_INTERFACE T_STRING extends_opt implements_opt interface_body
+    (TYPE-TAG $2 "interface" $5 (if (or $3 $4) (cons $3 $4)))
+  ;
+
+interface_body:
+    BRACE_BLOCK
+    (EXPANDFULL $1 interface_member_declaration)
+  ;
+
+interface_member_declaration:
+    LBRACE
+    ()
+  | RBRACE
+    ()
+  | block
+    ()
+  | interface_method_declaration
+  ;
+
+interface_method_declaration:
+  | method_opt function_declarator T_COLON function_return_type_hint T_SEMICOLON
+    (FUNCTION-TAG (car $2) (TAG $4 'metatype) (cdr $2) :typemodifiers $1)
+  | method_opt function_declarator T_SEMICOLON
+    (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers $1)
+  ;
 
 %%
 

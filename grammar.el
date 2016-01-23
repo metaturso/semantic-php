@@ -3,7 +3,7 @@
 ;; Copyright (C) 2015 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-12-16 03:26:15+0000
+;; Created: 2015-12-31 23:16:03+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -51,6 +51,7 @@
      ("new" . T_NEW)
      ("namespace" . T_NAMESPACE)
      ("class" . T_CLASS)
+     ("interface" . T_INTERFACE)
      ("abstract" . T_ABSTRACT)
      ("final" . T_FINAL)
      ("extends" . T_EXTENDS)
@@ -135,18 +136,22 @@
     (eval-when-compile
       (require 'semantic/wisent/comp))
     (wisent-compile-grammar
-     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK T_OPEN_TAG T_CLOSE_TAG S_NS_SCOPE T_COLON T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_AS T_USE T_CONST T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR T_TYPE_ARRAY T_TYPE_INT T_TYPE_BOOL T_TYPE_FLOAT T_TYPE_STRING T_TYPE_CALLABLE T_TYPE_SELF T_TYPE_PARENT)
+     '((T_NUMBER T_STRING T_CONSTANT_ENCAPSED_STRING T_ENCAPSED_AND_WHITESPACE T_VARIABLE mbstring LPAREN RPAREN LBRACE RBRACE LBRACK RBRACK PAREN_BLOCK BRACE_BLOCK BRACK_BLOCK T_OPEN_TAG T_CLOSE_TAG S_NS_SCOPE T_COLON T_SEMICOLON T_EQUAL T_COMMA T_SCOPE_RES T_NS_SEPARATOR T_AS T_USE T_CONST T_NULL T_TRUE T_FALSE T_NEW T_NAMESPACE T_CLASS T_INTERFACE T_ABSTRACT T_FINAL T_EXTENDS T_IMPLEMENTS T_PUBLIC T_PRIVATE T_PROTECTED T_STATIC T_FUNCTION T_ARRAY T_VAR T_TYPE_ARRAY T_TYPE_INT T_TYPE_BOOL T_TYPE_FLOAT T_TYPE_STRING T_TYPE_CALLABLE T_TYPE_SELF T_TYPE_PARENT)
        nil
        (grammar
         ((namespace_declaration))
-        ((class_declaration))
         ((use_declaration))
-        ((function_declaration)))
+        ((class_declaration))
+        ((function_declaration))
+        ((interface_declaration)))
        (local_variables
         ((T_VARIABLE local_variable_initialiser)
          (wisent-raw-tag
           (semantic-tag-new-variable $1
-                                     (car $2)
+                                     (wisent-raw-tag
+                                      (semantic-tag
+                                       (car $2)
+                                       'metatype))
                                      (cdr $2)))))
        (local_variable_initialiser
         ((T_EQUAL T_NULL)
@@ -202,7 +207,8 @@
          nil)
         ((use_declaration))
         ((class_declaration))
-        ((function_declaration)))
+        ((function_declaration))
+        ((interface_declaration)))
        (use_declaration
         ((T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON)
          (wisent-raw-tag
@@ -215,13 +221,15 @@
                                                 nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
-          (semantic-tag $3 'using :type
-                        (wisent-raw-tag
-                         (semantic-tag-new-type $3 $2
-                                                (list
-                                                 (wisent-raw-tag
-                                                  (semantic-tag-new-type $3 $2 nil nil)))
-                                                nil :kind 'alias :prototype t))))))
+          (semantic-tag
+           (semantic-php-name-nonnamespace $3)
+           'using :type
+           (wisent-raw-tag
+            (semantic-tag-new-type $3 $2
+                                   (list
+                                    (wisent-raw-tag
+                                     (semantic-tag-new-type $3 $2 nil nil)))
+                                   nil :kind 'alias :prototype t))))))
        (use_type
         ((T_CONST)
          (identity "variable"))
@@ -230,7 +238,7 @@
         (nil
          (identity "class")))
        (class_declaration
-        ((class_opt T_CLASS qualified_name extends_opt implements_opt class_body)
+        ((class_opt T_CLASS T_STRING extends_opt implements_opt class_body)
          (wisent-raw-tag
           (semantic-tag-new-type $3 "class" $6
                                  (if
@@ -281,7 +289,7 @@
         ((static_or_access_modifiers)))
        (attribute_initialiser
         (nil
-         (cons "mixed" "*undefined*"))
+         (cons "mixed" "*empty*"))
         ((T_EQUAL T_NULL)
          (cons "null" "null"))
         ((T_EQUAL boolean)
@@ -296,32 +304,34 @@
         ((T_NEW qualified_name)
          (identity $2)))
        (method_declaration
+        ((method_opt function_declarator T_COLON method_return_type_hint function_body)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $2)
+           (wisent-raw-tag
+            (semantic-tag $4 'metatype))
+           (cdr $2)
+           :typemodifiers $1)))
         ((method_opt function_declarator function_body)
          (wisent-raw-tag
           (semantic-tag-new-function
            (car $2)
            "mixed"
            (cdr $2)
-           :typemodifiers $1)))
-        ((method_opt function_declarator T_COLON method_return_type_hint function_body)
-         (wisent-raw-tag
-          (semantic-tag-new-function
-           (car $2)
-           $4
-           (cdr $2)
            :typemodifiers $1))))
        (function_declaration
+        ((function_declarator T_COLON function_return_type_hint function_body)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $1)
+           (wisent-raw-tag
+            (semantic-tag $3 'metatype))
+           (cdr $1))))
         ((function_declarator function_body)
          (wisent-raw-tag
           (semantic-tag-new-function
            (car $1)
            "mixed"
-           (cdr $1))))
-        ((function_declarator T_COLON function_return_type_hint function_body)
-         (wisent-raw-tag
-          (semantic-tag-new-function
-           (car $1)
-           $3
            (cdr $1)))))
        (function_declarator
         ((T_FUNCTION T_STRING formal_parameter_list)
@@ -348,12 +358,15 @@
         ((type_hint T_VARIABLE formal_parameter_initialiser)
          (wisent-raw-tag
           (semantic-tag-new-variable $2
-                                     (or $1
-                                         (car $3))
+                                     (wisent-raw-tag
+                                      (semantic-tag
+                                       (or $1
+                                           (car $3))
+                                       'metatype))
                                      (cdr $3)))))
        (formal_parameter_initialiser
         (nil
-         (cons "mixed" "*uninitialised*"))
+         (cons "mixed" "*empty*"))
         ((T_EQUAL T_NULL)
          (cons "null" "null"))
         ((T_EQUAL boolean)
@@ -392,7 +405,7 @@
         ((T_FALSE)))
        (qualified_name
         ((T_NS_SEPARATOR partial_qualified_name)
-         (identity "\\" $2))
+         (concat "\\" $2))
         ((partial_qualified_name)
          (identity $1)))
        (partial_qualified_name
@@ -406,13 +419,51 @@
         ((qualified_name)
          (list $1)))
        (static_or_access_modifiers
-        ((access_modifier T_STATIC)
-         (list $2 $1))
         ((T_STATIC access_modifier)
          (list $1 $2))
+        ((access_modifier T_STATIC)
+         (list $2 $1))
         ((access_modifier)
-         (list $1))))
-     '(grammar formal_parameters namespace_subparts class_member_declaration local_variables)))
+         (list $1)))
+       (interface_declaration
+        ((T_INTERFACE T_STRING extends_opt implements_opt interface_body)
+         (wisent-raw-tag
+          (semantic-tag-new-type $2 "interface" $5
+                                 (if
+                                     (or $3 $4)
+                                     (cons $3 $4))))))
+       (interface_body
+        ((BRACE_BLOCK)
+         (semantic-parse-region
+          (car $region1)
+          (cdr $region1)
+          'interface_member_declaration 1)))
+       (interface_member_declaration
+        ((LBRACE)
+         nil)
+        ((RBRACE)
+         nil)
+        ((block)
+         nil)
+        ((interface_method_declaration)))
+       (interface_method_declaration
+        (nil)
+        ((method_opt function_declarator T_COLON function_return_type_hint T_SEMICOLON)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $2)
+           (wisent-raw-tag
+            (semantic-tag $4 'metatype))
+           (cdr $2)
+           :typemodifiers $1)))
+        ((method_opt function_declarator T_SEMICOLON)
+         (wisent-raw-tag
+          (semantic-tag-new-function
+           (car $2)
+           "mixed"
+           (cdr $2)
+           :typemodifiers $1)))))
+     '(grammar formal_parameters namespace_subparts class_member_declaration interface_member_declaration local_variables)))
   "Parser table.")
 
 (defun grammar--install-parser ()
