@@ -101,23 +101,30 @@ grammar: namespace_declaration
 
 namespace_declaration:
     T_NAMESPACE qualified_name namespace_body
- ;; Set the `namespace' attribute on top-level tags, within the
- ;; namespace body, to be the name of the namespace.
- ;;
  ;; NOTE I'm not using the tags' `parent' attribute to avoid having to
  ;; mess about with method definitions. Plus, I set this attribute to
  ;; the namespace type tag ecb-sync-tags breaks, probably because of
  ;; circular references in the data.
  ;;
- ;; TODO Exclude variables with nil :constant-flag.
- ;; TODO Macro.
+ ;; TODO Exclude variables without the :constant-flag.
+ ;; TODO Macro this.
     (let ((namespace (TYPE-TAG $2 "namespace" nil nil)) members)
+      ;; Create the `namespace' 'type tag and set it across
+      ;; all the top level tags
       (dolist (tag $3 members)
-        ;; Don't add the namespace name to the include, namespace and
-        ;; using tags.
-        (if (memq (semantic-tag-class tag) '(include using namespace))
-            (setq members (cons (semantic-tag-put-attribute tag :namespace $2) members))
-          (setq members (cons tag members))))
+        ;; We don't do anything on includes and using tags because we
+        ;; don't want to qualify their name! Namespaces are also
+        ;; ignored, but because they shouldn't appear nested in the
+        ;; first place.
+        ;;
+        ;; On all other tags we set the `namespace' attribute and
+        ;; qualify their name.
+        (unless (memq (semantic-tag-class tag) '(include using namespace))
+          ;; (semantic-tag-put-attribute tag :alias (ALIAS-TAG (car tag)
+          ;;            'type
+          ;;            (semantic-php--resolve-symbol-for-tag (car tag) $2)))
+          (semantic-tag-put-attribute tag :namespace $2))
+        (setq members (cons tag members)))
       (semantic-tag-put-attribute namespace :members (nreverse members))
       namespace)
   ;
@@ -439,3 +446,10 @@ It ignores whitespaces, newlines and comments."
   grammar--<string>-sexp-analyzer
   grammar--<quoted-string>-sexp-analyzer
   grammar--<mb>-regexp-analyzer)
+
+(defun semantic-php--resolve-symbol-for-tag (symbol &optional ns-scope)
+  "Fully qualifies a symbol name tag based on namespace and import rules."
+  (unless (or (null ns-scope) (equal ns-scope "\\"))
+    (setq ns-scope (concat "\\" ns-scope "\\")))
+  ;; (message "Parser qualifying symbol in NS %s: %s => %s" ns-scope symbol (concat ns-scope symbol))
+  (concat ns-scope symbol))
