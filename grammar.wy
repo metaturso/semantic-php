@@ -104,6 +104,7 @@
 ;; This nonterminal is used to parse blocks of code in
 ;; semantic-get-local-variables.
 %start local_variables
+%scopestart local_variables
 
 %%
 
@@ -164,10 +165,21 @@ namespace_declaration:
         ;;
         ;; On all other tags we set the `namespace' attribute and
         ;; qualify their name.
-        (unless (memq (semantic-tag-class tag) '(include using namespace))
+        ;; (message "Is current tag of class '(include using namespace alias)? [%s, %s]"
+        ;;          (semantic-tag-class tag)
+        ;;          (if (memq (semantic-tag-class tag) '(include using namespace alias)) "yes" "no"))
+
+        (unless (memq (semantic-tag-class tag) '(include using namespace alias))
+          ;; the name should be aliased iff:
+          ;; 1. we're not in the global namespace (which considering this code
+          ;; is inlined in the namespace rule we are not in)
+          ;;
+          ;; 2. the name is not fully qualified
+          ;;
           ;; (semantic-tag-put-attribute tag :alias (ALIAS-TAG (car tag)
           ;;            'type
           ;;            (semantic-php--resolve-symbol-for-tag (car tag) $2)))
+
           (semantic-tag-put-attribute tag :namespace $2))
         (setq members (cons tag members)))
       (semantic-tag-put-attribute namespace :members (nreverse members))
