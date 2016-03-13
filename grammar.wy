@@ -235,9 +235,11 @@ namespace_subparts:
 ;; member of TYPE, but I'll keep it for consistency with C++.
 use_declaration:
     T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
-    (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG $5 'using :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
+    ;; (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   | T_USE use_type qualified_name T_SEMICOLON
-    (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
+    ;; (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   ;
 
 use_type:
