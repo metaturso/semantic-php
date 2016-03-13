@@ -44,11 +44,12 @@
 
 (define-mode-local-override semantic-analyze-split-name php-mode (name)
   "Split up tag NAME into multiple components."
-  (let (nameparts (semantic-php-name-parts name))
-    (message "semantic-analyze-split-name: [%s => %s]" nameparts)
+  (let ((nameparts (semantic-php-name-parts name)) result)
     (if (null (car nameparts))
-        (list "\\" (cdr nameparts))
-      (list (car nameparts) (cdr nameparts)))))
+        (setq result (list "\\" (cdr nameparts)))
+      (setq result (list (car nameparts) (cdr nameparts))))
+    (message "semantic-analyze-split-name: [%s => %s]" name result)
+    result))
 
 (define-mode-local-override semantic-analyze-unsplit-name php-mode (nameparts)
   "Joins the two parts of split NAME into a qualified name."
@@ -68,9 +69,11 @@
 ;;   ;; match the current namespace? If yes we might be able to find our
 ;;   ;; way around the file system without knowing anything else, elthough
 ;;   ;; we should rely on ede.
-;;   (message "semanticdb-find-table-for-include: searching tag table")
+;;   (message "semanticdb-find-table-for-include: Searching tag table for include [%s]" (car includetag))
 ;;   (if (and (featurep 'ede-php-autoload) (ede-current-project))
-;;       (semantic-file-tag-table (ede-php-autoload-find-class-def-file (ede-current-project) (car includetag)))))
+;;       (let ((file-name (ede-php-autoload-find-class-def-file (ede-current-project) (car includetag))))
+;;         (message "semanticdb-find-table-for-include: candidate file %s" file-name)
+;;         (semantic-file-tag-table file-name))))
 
 (define-mode-local-override semantic-ctxt-scoped-types php-mode (&optional point)
   "Return a list of type names currently in scope at POINT.
@@ -130,6 +133,9 @@ will return the concrete type defined by TYPE.
 Just a name, or short tag will be ok.
 SCOPE is the scope object with additional items in which to search for names."
   (message "semantic-analyze-dereference-metatype: dereferencing")
+  ;; NOTE I'll have to clean this up and make sure that all
+  ;; dereferencers are given an equal upportunity to find a type or
+  ;; fail.
   (cond
    ;; The parser adds the `namespace' attribute to tags under
    ;; a namespace, so we can use this information to fully
@@ -139,9 +145,6 @@ SCOPE is the scope object with additional items in which to search for names."
          (semantic-tag-get-attribute type :namespace))
     (semantic-php-dereference-type-under-namespace type scope type-declaration))
 
-   ;; Dereference a type used in an assignment, for example:
-   ;; $d = new \StdClass();
-   ;; $d->.
    ((and (semantic-tag-p type-declaration)
          (or (null type) (semantic-tag-prototype-p type)))
     (semantic-php-dereference-type-declaration type scope type-declaration))
@@ -164,6 +167,7 @@ SCOPE is the scope object with additional items in which to search for names."
                (car type)
                typename)
 
+      ;; TODO typecache/semanticdb lookups for cached tags.
       (list type type-declaration)))
 
 ;; As a sidenote, it might still be worth investigating the
@@ -173,7 +177,7 @@ SCOPE is the scope object with additional items in which to search for names."
 (defun semantic-php-dereference-type-declaration (type scope &optional type-declaration)
   ""
   (let ((scopetypes (oref scope scopetypes))
-	typeparts typename result importrule currentns)
+	typeparts typename localname result importrule currentns)
 
       (setq typename (semantic-tag-name type-declaration))
       (setq typeparts (semantic-analyze-split-name typename))
@@ -183,33 +187,45 @@ SCOPE is the scope object with additional items in which to search for names."
           (progn (message "semantic-php-dereference-type: Fully qualified name [%s] (type: %s)" typename type)
                  (setq result (list type type-declaration)))
 
-        (message "semantic-php-dereference-type: import lookup loop, started.")
-        (dolist (scopetype scopetypes result)
-          (setq importrule (semantic-tag-type scopetype))
-          ;; Lookup the typename in the list of types registered in
-          ;; the local scope.
-          (when (string-equal (semantic-php-name-nonnamespace (semantic-tag-name scopetype)) typename)
-            (message "semantic-php-dereference-type: Found import rule [%s => %s]"
+        (message "semantic-php-dereference-type: Partially qualified name [%s] (type: %s)." typename type)
+        (message "semantic-php-dereference-type: Import rule lookup loop, started.")
+
+        (catch 'result
+          (dolist (scopetype scopetypes result)
+            (setq localname (semantic-php-name-nonnamespace (semantic-tag-name scopetype)))
+            (setq importrule (semantic-tag-type scopetype))
+
+            (message "semantic-php-dereference-type: Analysing [%s] against import rule [%s => %s]"
                      typename
-                     (semantic-tag-name importrule))
-            ;; (message "import rule")
-            ;; (pp importrule)
-            ;; (message "import rule type/prototype")
-            (setq type (car (semantic-tag-get-attribute importrule :members)))
-            (message "semantic-php-dereference-type: Dereferenced [%s => %s]"
-                     typename
-                     type)
-            (setq result (list type type-declaration))
-            ))
-        (message "semantic-php-dereference-type: import lookup loop, done.")
+                     (car importrule)
+                     localname
+                     )
+            ;; When the metatype matches one of the known local types we
+            ;; know it can be traced back to a `using' tag.
+            (when (equal localname typename)
+              (message "semantic-php-dereference-type: Found import rule [%s => %s]"
+                       typename
+                       (semantic-tag-name importrule))
+
+              ;; (message "import rule")
+              ;; (pp importrule)
+              ;; (message "import rule type/prototype")
+              (setq type (car (semantic-tag-get-attribute importrule :members)))
+              (message "semantic-php-dereference-type: Dereferenced [%s => %s]"
+                       typename
+                       importrule)
+              (setq result (list importrule type-declaration))
+              (throw 'result result)
+              )))
+        (message "semantic-php-dereference-type: Import rule lookup loop, done.")
         )
 
       (unless result
-        (message "semantic-php-dereference-type: no import rule found for %s" typename))
+        (message "semantic-php-dereference-type: No import rule found for %s" typename))
 
-    (if result
-        (list result result)
-      (list type type-declaration))))
+      (if result
+          (list result result)
+        (list type type-declaration))))
 
 (defun semantic-php-dereference-type-alias (type namespace)
   "Dereference TYPE in NAMESPACE, given that NAMESPACE is an alias.
@@ -393,12 +409,22 @@ will produce the following tags:
 - alias `AliasedClass'
 - include `My\\Ns\\SomeClass'
 - include `My\\Ns\\AnotherClass'"
-  (let* ((symbol-alias (semantic-tag-name using-tag))
-         (type-tag (semantic-tag-get-attribute using-tag :type))
-         (fully-qualified-name (semantic-tag-name type-tag))
-
-         ;; Mmh, Let's produce a new type tag to link the local
-         ;; type to the fully qualified name.
+  (let* ((type-tag (semantic-tag-get-attribute using-tag :type))
+         ;; fq-type-name is the part after the PHP `use' keyword and
+         ;; the following semicolon or `as' keyword.
+         (fq-type-name (semantic-tag-name type-tag))
+         ;; local-type-name is collected by the parser and it's either
+         ;; the last part of a qualified name, or the alias after the
+         ;; PHP `as' keyword. This will be the name of the type in the
+         ;; local scope.
+         (local-type-name (semantic-tag-name using-tag))
+         ;; actual-type-name is the last part of the fully
+         ;; qualified name before the `as' keyword. We'll test this
+         ;; value against local-type-name to know when imported types
+         ;; are getting aliased.
+         (actual-type-name (semantic-php-name-nonnamespace fq-type-name))
+         ;; TEST: Produce a new `alias' tag to link the local type to the
+         ;; fully qualified name.
          ;;
          ;; TODO Maybe this isn't needed considering the dereference
          ;; function. I need to dig that conversation between Eric
@@ -407,18 +433,16 @@ will produce the following tags:
          ;; of determining scoped types, however this may negatively
          ;; affect performance.
          ;;
-         ;; NOTE Changes to this alias will probably require changes to the
-         ;; functions:
+         ;; NOTE Changes to the data in this tag will probably require
+         ;; changes to the functions:
          ;;
          ;; 1. semantic-ctxt-scoped-types
          ;; 2. semantic-analyze-dereference-type
-         (alias-tag (semantic-tag-new-alias symbol-alias 'type fully-qualified-name))
-         (include-tag (semantic-tag-new-include fully-qualified-name nil)))
+         (alias-tag (semantic-tag-new-alias local-type-name 'type fq-type-name))
 
-    (message "semantic-php-tag-expand-using: expanded imported type [%s => %s]"
-             symbol-alias
-             fully-qualified-name)
-
+         ;; Produce a new `include' tag to hint Semantic of the external
+         ;; dependency.
+         (include-tag (semantic-tag-new-include fq-type-name nil)))
     (semantic-tag-set-bounds include-tag (semantic-tag-start using-tag) (semantic-tag-end using-tag))
     (list using-tag include-tag alias-tag)))
 
