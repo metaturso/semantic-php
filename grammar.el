@@ -1,9 +1,9 @@
 ;;; grammar.el --- Generated parser support file
 
-;; Copyright (C) 2015 Andrea Turso
+;; Copyright (C) 2016 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2015-12-31 23:16:03+0000
+;; Created: 2016-03-14 05:04:11+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -175,16 +175,13 @@
               members)
            (dolist
                (tag $3 members)
-             (if
+             (unless
                  (memq
                   (semantic-tag-class tag)
-                  '(include using namespace))
-                 (setq members
-                       (cons
-                        (semantic-tag-put-attribute tag :namespace $2)
-                        members))
-               (setq members
-                     (cons tag members))))
+                  '(include using namespace alias))
+               (semantic-tag-put-attribute tag :namespace $2))
+             (setq members
+                   (cons tag members)))
            (semantic-tag-put-attribute namespace :members
                                        (nreverse members))
            namespace)))
@@ -214,22 +211,14 @@
          (wisent-raw-tag
           (semantic-tag $5 'using :type
                         (wisent-raw-tag
-                         (semantic-tag-new-type $3 $2
-                                                (list
-                                                 (wisent-raw-tag
-                                                  (semantic-tag-new-type $3 $2 nil nil)))
-                                                nil :kind 'alias :prototype t)))))
+                         (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
           (semantic-tag
            (semantic-php-name-nonnamespace $3)
            'using :type
            (wisent-raw-tag
-            (semantic-tag-new-type $3 $2
-                                   (list
-                                    (wisent-raw-tag
-                                     (semantic-tag-new-type $3 $2 nil nil)))
-                                   nil :kind 'alias :prototype t))))))
+            (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t))))))
        (use_type
         ((T_CONST)
          (identity "variable"))
@@ -603,6 +592,13 @@ It ignores whitespaces, newlines and comments."
   grammar--<string>-sexp-analyzer
   grammar--<quoted-string>-sexp-analyzer
   grammar--<mb>-regexp-analyzer)
+
+(defun semantic-php--resolve-symbol-for-tag (symbol &optional ns-scope)
+  "Fully qualifies a symbol name tag based on namespace and import rules."
+  (unless (or (null ns-scope) (equal ns-scope "\\"))
+    (setq ns-scope (concat "\\" ns-scope "\\")))
+  ;; (message "Parser qualifying symbol in NS %s: %s => %s" ns-scope symbol (concat ns-scope symbol))
+  (concat ns-scope symbol))
 
 (provide 'grammar)
 
