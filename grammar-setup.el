@@ -1,21 +1,6 @@
 ;;; setup.el --- An iterative style parser for PHP 5.5 buffers
 ;;; Commentary:
 ;;
-;; This file is used to configure and install a tagging PHP parser
-;; that extracts crucial information about the symbols defined and
-;; used in a php buffer.
-;;
-;;
-;; TODO
-;;
-;; - BUG type hints with "mixed" type cause a new type to be recorded as a
-;; member. We need to ignore these.
-;; - ??? I'm yet unsure about the usability of the name splitting function (ns . type)
-;; - inline completion still won't work unless a .hh or .cpp file is opened, this
-;; indicates that I need to override some more functions. This is most likely caused by the
-;; use of a metatype tag; did this happen with alias tags too?
-;; - dequalify scoped types
-;;
 
 ;;; Code:
 
@@ -31,30 +16,108 @@
 ;; Import the PHP grammar automaton.
 (require 'grammar)
 
-;; TODO Will need update once I'm decided whether the global namespace
-;; gets its own tag or a scope.
-(defun semantic-php--guess-current-ns (&optional point)
-  "Guess the PHP namespace at point, or POINT if it is given.
-Returns the namespace tag, or nil when it's hard to guess or the
-point is in the global namespace."
-  (if point (goto-char point))
-  (let ((table (or (semantic-find-tag-by-overlay) (current-buffer)))
-        outermost)
-    (when (listp table)
-      (setq outermost (car (cdr (nreverse table)))))
-    (if (and (semantic-tag-p outermost)
-             (equal (semantic-tag-type outermost) "namespace"))
-        outermost
-      (unless (semantic-tag-get-attribute outermost :namespace)
-        outermost))
-    outermost))
+(define-mode-local-override semantic-tag-protection
+  php-mode (tag &optional parent)
+  "Return protection information about TAG with optional PARENT.
+This function returns on of the following symbols:
+   'public    - Anyone can access this TAG.
+   'private   - Only methods in the local scope can access TAG.
+   'protected - Like private for outside scopes, like public for child
+                classes.
 
-(defun semantic-php-current-ns-name (&optional point)
-  "Guess the PHP namespace at point, or POINT if it is given."
-  (let ((currentns (semantic-php--guess-current-ns point)))
-    (if currentns
-        currentns
-      "\\")))
+This is overridden to avoid interaction with Semantic C and PHP."
+  (cond
+   ((member "public" (semantic-tag-modifiers tag))
+    'public)
+   ((member "private" (semantic-tag-modifiers tag))
+    'private)
+   ((member "protected" (semantic-tag-modifiers tag))
+    'protected)))
+
+(define-mode-local-override semantic-tag-alias-definition php-mode (tag)
+  "Return the definition TAG is an alias.
+The returned value is a tag of the class that
+`semantic-tag-alias-class' returns for TAG.
+The default is to return the value of the :definition attribute.
+Return nil if TAG is not of class 'alias."
+  (message "semantic-tag-alias-definition: Alias definition for tag?" (car tag)))
+
+;; TODO I need to investigate why %scopestart fails to provide
+;; bovine-inner-scope so that semantic-get-all-local-variables-default
+;; can work with a simple get-local-variables.
+(define-mode-local-override semantic-get-local-variables php-mode (&optional point)
+  "Get the local variables based on POINT's context.
+Local variables are returned in Semantic tag format."
+  ;; Disable parsing messages
+  (let ((semantic--progress-reporter nil))
+    (save-excursion
+      (if point (goto-char point))
+      (let ((semantic-unmatched-syntax-hook nil)
+            (start (point))
+            (firstusefulstart nil)
+            vars
+            parent-tag)
+
+        (while (not (semantic-up-context (point) 'function))
+          (when (not vars)
+            (setq firstusefulstart (point)))
+          (save-excursion
+            (forward-char 1)
+
+            (setq parent-tag (semantic-tag-calculate-parent (semantic-current-tag)))
+
+            ;; Check if we're in a method.
+            (when (and parent-tag
+                       (semantic-tag-of-class-p parent-tag 'type)
+                       (member (semantic-tag-type parent-tag) '("class" "interface" "trait")))
+
+              (push (semantic-tag-new-variable "$this" parent-tag) vars)
+              (push (semantic-tag-new-variable "static" parent-tag) vars)
+              (push (semantic-tag-new-variable "self" parent-tag) vars)
+
+              (when (semantic-tag-type-superclasses parent-tag)
+                (push (semantic-tag-new-variable "parent" (car (semantic-tag-type-superclasses parent-tag))) vars)))
+
+            ;; TODO these tags probably all need :filename
+            (setq vars (append (semantic-parse-region (point)
+                                               (save-excursion (semantic-end-of-context) (point))
+                                               'local_variables
+                                               nil
+                                               t) vars))))
+
+        ;; (message "Parsed variables [first useful start %d]" firstusefulstart)
+        ;; (pp vars)
+
+        ;; Hash our value into the first context that produced useful results.
+        (when (and vars firstusefulstart)
+          (let ((end (save-excursion
+                       (goto-char firstusefulstart)
+                       (save-excursion
+                         (unless (semantic-end-of-context)
+                           (point))))))
+            ;; (message "Caching values %d->%d." firstusefulstart end)
+            (semantic-cache-data-to-buffer
+             (current-buffer) firstusefulstart
+             (or end
+                 ;; If the end-of-context fails,
+                 ;; just use our cursor starting
+                 ;; position.
+                 start)
+             vars 'get-local-variables 'exit-cache-zone))
+          )
+        ;; Return our list.
+        vars))))
+
+(define-mode-local-override semantic-find-tags-included php-mode (&optional table)
+  "Find all tags in TABLE that are namespaces or of the 'include and class.
+TABLE is a tag table.  See `semantic-something-to-tag-table'."
+  ;; TODO limit to current 'scope', also a better alternative to
+  ;; flattening the tag table, since we could simply get the outermost
+  ;; tag (and handle global namespace separately, until I figure out
+  ;; whether or not I'll always wrap tags in a namespace, i.e. even
+  ;; with \\\\)
+  (unless table (setq table (current-buffer)))
+  (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
 
 ;; TODO: Handle file name resolution outside of ede-php-autoload projects.
 (define-mode-local-override semantic-tag-include-filename php-mode (tag)
@@ -264,7 +327,6 @@ SCOPE is the scope object with additional items in which to search for names."
 This dereferenced works only when TYPE-DECLARATION is provided, which means
 it's resolving a name used in a parameter or return type hint, an assignment,
 but not a use statement."
-  ;; (message "semantic-php-dereference-metatype: resolving metatype [%s]" (car type-declaration))
   (let ((scopetypes (oref scope scopetypes))
         currentns namespaces typename result importrules)
     (when (and (semantic-tag-p type-declaration)
@@ -273,13 +335,6 @@ but not a use statement."
       (when (stringp typename)
         (setq typename (list typename)))
 
-      (message "semantic-php-dereference-metatype: Split name is [%s]" typename)
-      (message "semantic-php-dereference-metatype: Tag [%s] in cache? [%s]"
-               typename
-               (if (semantic-deep-find-tags-by-name (or (car (last typename)) typename) scopetypes)
-                   "YES"
-                 "NO")
-               )
       ;; (car typename) will be either the non-qualified name, or the
       ;; namespace part of a partially qualified name.
       (if (or (null (car typename))
@@ -287,8 +342,6 @@ but not a use statement."
           ;; Name not qualified at all, or its namespace part is not
           ;; fully qualified (i.e. it does not begin with \\).
 
-          ;; FIXME execution stopped here after I changed split function
-          ;; and typename is sometimes a string.
           (progn (setq typename (car (last typename)))
                  (message "Preparing lookup up P_QN [%s] in SCOPE imported types." typename)
                  (setq namespaces (semantic-find-tags-by-class 'type scopetypes))
@@ -299,7 +352,7 @@ but not a use statement."
 
         ;; So we only have to search one namespace.
         (message "Preparing lookup of F_QN [%s] in TYPECACHE." (car typename))
-        (message "^ FIXME unchecked path.")
+        (error "^ FIXME unchecked path.")
         (setq namespaces (semanticdb-typecache-find typename))
 
         ;; Make sure it's really a namespace.
@@ -336,14 +389,6 @@ but not a use statement."
     (if result
         (list result result)
       (list type type-declaration))))
-
-;; old business of dereferencing imported type
-    ;; (if (and
-    ;;      (setq ns (semantic-tag-name namespace))
-    ;;      (equal (semantic-php-name-nonnamespace ns) (car (last typename)))
-    ;;      (setq nstype (semanticdb-typecache-find ns)))
-    ;;     (pron1 nstype (message "semantic-php-dereference-imported-type: %s" type))
-    ;;   )
 
 (defun semantic-php-dereference-imported-type (type namespace)
   "Finds the concrete type matching TYPE the import rules in NAMESPACE.
@@ -405,109 +450,6 @@ a dereferencer function."
     (message "semantic-php-dereference-import-rules: returning with [%s]" importfound)
     importfound))
 
-(define-mode-local-override semantic-tag-protection
-  php-mode (tag &optional parent)
-  "Return protection information about TAG with optional PARENT.
-This function returns on of the following symbols:
-   'public    - Anyone can access this TAG.
-   'private   - Only methods in the local scope can access TAG.
-   'protected - Like private for outside scopes, like public for child
-                classes.
-
-This is overridden to avoid interaction with Semantic C and PHP."
-  (cond
-   ((member "public" (semantic-tag-modifiers tag))
-    'public)
-   ((member "private" (semantic-tag-modifiers tag))
-    'private)
-   ((member "protected" (semantic-tag-modifiers tag))
-    'protected)))
-
-(define-mode-local-override semantic-tag-alias-definition php-mode (tag)
-  "Return the definition TAG is an alias.
-The returned value is a tag of the class that
-`semantic-tag-alias-class' returns for TAG.
-The default is to return the value of the :definition attribute.
-Return nil if TAG is not of class 'alias."
-  (message "semantic-tag-alias-definition: Alias definition for tag?" (car tag)))
-
-;; TODO I need to investigate why %scopestart fails to provide
-;; bovine-inner-scope so that semantic-get-all-local-variables-default
-;; can work with a simple get-local-variables.
-(define-mode-local-override semantic-get-local-variables php-mode (&optional point)
-  "Get the local variables based on POINT's context.
-Local variables are returned in Semantic tag format."
-  ;; Disable parsing messages
-  (let ((semantic--progress-reporter nil))
-    (save-excursion
-      (if point (goto-char point))
-      (let ((semantic-unmatched-syntax-hook nil)
-            (start (point))
-            (firstusefulstart nil)
-            vars
-            parent-tag)
-
-        (while (not (semantic-up-context (point) 'function))
-          (when (not vars)
-            (setq firstusefulstart (point)))
-          (save-excursion
-            (forward-char 1)
-
-            (setq parent-tag (semantic-tag-calculate-parent (semantic-current-tag)))
-
-            ;; Check if we're in a method.
-            (when (and parent-tag
-                       (semantic-tag-of-class-p parent-tag 'type)
-                       (member (semantic-tag-type parent-tag) '("class" "interface" "trait")))
-
-              (push (semantic-tag-new-variable "$this" parent-tag) vars)
-              (push (semantic-tag-new-variable "static" parent-tag) vars)
-              (push (semantic-tag-new-variable "self" parent-tag) vars)
-
-              (when (semantic-tag-type-superclasses parent-tag)
-                (push (semantic-tag-new-variable "parent" (car (semantic-tag-type-superclasses parent-tag))) vars)))
-
-            ;; TODO these tags probably all need :filename
-            (setq vars (append (semantic-parse-region (point)
-                                               (save-excursion (semantic-end-of-context) (point))
-                                               'local_variables
-                                               nil
-                                               t) vars))))
-
-        ;; (message "Parsed variables [first useful start %d]" firstusefulstart)
-        ;; (pp vars)
-
-        ;; Hash our value into the first context that produced useful results.
-        (when (and vars firstusefulstart)
-          (let ((end (save-excursion
-                       (goto-char firstusefulstart)
-                       (save-excursion
-                         (unless (semantic-end-of-context)
-                           (point))))))
-            ;; (message "Caching values %d->%d." firstusefulstart end)
-            (semantic-cache-data-to-buffer
-             (current-buffer) firstusefulstart
-             (or end
-                 ;; If the end-of-context fails,
-                 ;; just use our cursor starting
-                 ;; position.
-                 start)
-             vars 'get-local-variables 'exit-cache-zone))
-          )
-        ;; Return our list.
-        vars))))
-
-(define-mode-local-override semantic-find-tags-included php-mode (&optional table)
-  "Find all tags in TABLE that are namespaces or of the 'include and class.
-TABLE is a tag table.  See `semantic-something-to-tag-table'."
-  ;; TODO limit to current 'scope', also a better alternative to
-  ;; flattening the tag table, since we could simply get the outermost
-  ;; tag (and handle global namespace separately, until I figure out
-  ;; whether or not I'll always wrap tags in a namespace, i.e. even
-  ;; with \\\\)
-  (unless table (setq table (current-buffer)))
-  (semantic-find-tags-by-class 'include (semantic-flatten-tags-table table)))
-
 (defun semantic-php-name-nonnamespace (name)
   "Returns the non-namespace part of NAME."
   (cdr (semantic-php-name-parts name)))
@@ -552,10 +494,12 @@ use My\\Ns\\SomeClass;
 use My\\Ns\\AnotherClass as AliasedClass;
 
 will produce the following tags:
-- alias `SomeClass' and
-- alias `AliasedClass'
-- include `My\\Ns\\SomeClass'
-- include `My\\Ns\\AnotherClass'"
+- include My\\Ns\\SomeClass
+- include My\\Ns\\AnotherClass
+- using SomeClass
+- using AliasClass
+- metatype SomeClass
+- metatype AliasedClass"
   (let* ((type-tag (semantic-tag-get-attribute using-tag :type))
          ;; fq-type-name is the part after the PHP `use' keyword and
          ;; the following semicolon or `as' keyword.
@@ -595,8 +539,6 @@ will produce the following tags:
 
 (defun semantic-php-tag-expand (tag)
   ""
-  ;; (message "semantic-php-tag-expand: expanding tag %s" (car tag))
-
   ;; Until another solution is found, remove leading dollar sign from
   ;; instance attributes. This will allow autocompletion in from of a
   ;; $instance-> prefix.
@@ -613,8 +555,32 @@ will produce the following tags:
   ;; TODO handle variables(constants), functions and classes/namespaces
   ;; accordingly.
   (when (semantic-tag-of-class-p tag 'using)
-    (semantic-php-tag-expand-using tag))
-  )
+    (semantic-php-tag-expand-using tag)))
+
+(defun semantic-php-current-ns-name (&optional point)
+  "Guess the PHP namespace at point, or POINT if it is given."
+  (let ((currentns (semantic-php--guess-current-ns point)))
+    (if currentns
+        currentns
+      "\\")))
+
+;; TODO Will need update once I'm decided whether the global namespace
+;; gets its own tag or a scope.
+(defun semantic-php--guess-current-ns (&optional point)
+  "Guess the PHP namespace at point, or POINT if it is given.
+Returns the namespace tag, or nil when it's hard to guess or the
+point is in the global namespace."
+  (if point (goto-char point))
+  (let ((table (or (semantic-find-tag-by-overlay) (current-buffer)))
+        outermost)
+    (when (listp table)
+      (setq outermost (car (cdr (nreverse table)))))
+    (if (and (semantic-tag-p outermost)
+             (equal (semantic-tag-type outermost) "namespace"))
+        outermost
+      (unless (semantic-tag-get-attribute outermost :namespace)
+        outermost))
+    outermost))
 
 ;;;###autoload
 (defun grammar-setup ()
