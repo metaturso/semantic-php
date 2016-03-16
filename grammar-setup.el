@@ -253,9 +253,8 @@ SCOPE is the scope object with additional items in which to search for names."
 
     (when (and (or type type-declaration) (not (eq type original-type)))
       (ignore-errors
-        (message "Dereferenced metatype [%s => %s:%s]"
+        (message "Dereferenced metatype [%s => %s]"
                  (or (car-safe original-type) (format "<declaration:%s>" tmp))
-                 (semantic-tag-get-attribute type :namespace)
                  (car-safe type))))
 
     (list type type-declaration)))
@@ -324,15 +323,13 @@ but not a use statement."
                                         (mapcar (lambda (ct)
                                                   (if (semantic-tag-of-class-p ct 'using) ct))
                                                   importrules))))
-              ;; (pp importrules)
-            (message "semantic-php-dereference-metatype: Checking imports rule in buffer [%s]" typename)
+            (message "semantic-php-dereference-metatype: Checking imported name [%s]" typename)
             (setq result (semantic-php-dereference-import-rules typename importrules)))
-          (when result (message "semantic-php-dereference-metatype: Found [%s]" typename result)
 
-          (if result (message "semantic-php-dereference-metatype: Found (via using) [%s]" typename result)
-            (message "semantic-php-dereference-metatype: No matches yet [%s]" typename))
+          (unless result
+              (message "semantic-php-dereference-metatype: No matches yet [%s]" typename))
 
-          (setq namespaces (cdr namespaces)))
+          (setq namespaces (cdr namespaces))
         )
       )
 
@@ -391,7 +388,8 @@ a dereferencer function."
       (unless (listp importname)
         (setq importname (list importname)))
 
-      (if (member (semantic-tag-type importtype) (list "class"))
+      (if (and (equal localname (car (last importname)))
+               (member (semantic-tag-type importtype) (list "class")))
           (setq importfound importtype)
         (cond
          ((equal localname (car (last importname)))
@@ -406,29 +404,6 @@ a dereferencer function."
       (setq importrules (cdr importrules)))
     (message "semantic-php-dereference-import-rules: returning with [%s]" importfound)
     importfound))
-
-
-;; this body is taken from a commit and is known to complete Trigger
-;; but not aliased types
-;; (let ((typename (semantic-analyze-split-name (semantic-tag-name type)))
-;;       (table (semantic-flatten-tags-table namespace))
-;;       importrules
-;;       importfound)
-
-;;   (setq importrules (semantic-find-tags-by-name (semantic-tag-name type) table))
-;;   (setq importrules (remove nil (mapcar
-;;                      (lambda (ct)
-;;                        (if (semantic-tag-of-class-p ct 'using)
-;;                            ct))
-;;                      importrules)))
-;;   (while (and (not importfound) importrules)
-;;     (setq currentrule (car importrules))
-;;     (when (equal (semantic-tag-name type)
-;;                  (semantic-tag-name currentrule))
-;;       ;; Make sure this is a prototype+:kind=alias?
-;;       (setq importfound (semanticdb-typecache-find (semantic-tag-name (semantic-tag-type currentrule)))))
-;;     (setq importrules (cdr importrules)))
-;;   importfound)))
 
 (define-mode-local-override semantic-tag-protection
   php-mode (tag &optional parent)
