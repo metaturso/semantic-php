@@ -3,7 +3,7 @@
 ;; Copyright (C) 2016 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2016-03-20 02:04:44+0000
+;; Created: 2016-03-20 02:50:56+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -203,6 +203,7 @@
         ((T_SEMICOLON)
          nil)
         ((use_declaration))
+        ((const_declaration))
         ((class_declaration))
         ((function_declaration))
         ((interface_declaration)))
@@ -211,22 +212,31 @@
          (wisent-raw-tag
           (semantic-tag $5 'using :type
                         (wisent-raw-tag
-                         (semantic-tag-new-type $3 $2
-                                                (list
-                                                 (wisent-raw-tag
-                                                  (semantic-tag-new-type $3 $2 nil nil)))
-                                                nil :kind 'alias :prototype t)))))
+                         (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
           (semantic-tag
            (semantic-php-name-nonnamespace $3)
            'using :type
            (wisent-raw-tag
-            (semantic-tag-new-type $3 $2
-                                   (list
-                                    (wisent-raw-tag
-                                     (semantic-tag-new-type $3 $2 nil nil)))
-                                   nil :kind 'alias :prototype t))))))
+            (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t))))))
+       (const_declaration
+        ((T_CONST T_STRING const_initialiser)
+         (wisent-raw-tag
+          (semantic-tag-new-variable $2
+                                     (car $3)
+                                     (cdr $3)
+                                     :constant-flag t))))
+       (const_initialiser
+        ((T_EQUAL T_NULL)
+         (cons "null" "null"))
+        ((T_EQUAL boolean)
+         (cons "boolean" $2))
+        ((T_EQUAL T_CONSTANT_ENCAPSED_STRING)
+         (cons "string"
+               (substring $2 1 -1)))
+        ((T_EQUAL T_NUMBER)
+         (cons "number" $2)))
        (use_type
         ((T_CONST)
          (identity "variable"))

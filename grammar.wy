@@ -134,7 +134,7 @@ local_variable_initialiser:
   | T_EQUAL class_instantiation
     (cons $2 $2)
   | T_EQUAL T_CONSTANT_ENCAPSED_STRING
-    (cons "string" $2)
+    (cons "string" (substring $2 1 -1))
   | T_EQUAL T_NUMBER
     (cons "number" $2)
   ;
@@ -208,6 +208,7 @@ namespace_subparts:
   | T_SEMICOLON
     ()
   | use_declaration
+  | const_declaration
   | class_declaration
   | function_declaration
   | interface_declaration
@@ -233,6 +234,22 @@ use_declaration:
          :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
     ;; (TAG (semantic-php-name-nonnamespace $3) 'using
     ;;      :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+  ;
+
+const_declaration:
+    T_CONST T_STRING const_initialiser
+    (VARIABLE-TAG $2 (car $3) (cdr $3) :constant-flag t)
+  ;
+
+const_initialiser:
+    T_EQUAL T_NULL
+    (cons "null" "null")
+  | T_EQUAL boolean
+    (cons "boolean" $2)
+  | T_EQUAL T_CONSTANT_ENCAPSED_STRING
+    (cons "string" (substring $2 1 -1))
+  | T_EQUAL T_NUMBER
+    (cons "number" $2)
   ;
 
 use_type:
@@ -304,7 +321,7 @@ attribute_initialiser: ;; EMPTY
                      | T_EQUAL BRACK_BLOCK
                        (cons "array" $2)
                      | T_EQUAL T_CONSTANT_ENCAPSED_STRING
-                       (cons "string" $2)
+                       (cons "string" (substring $2 1 -1))
                      | T_EQUAL T_NUMBER
                        (cons "number" $2)
                      ;
@@ -365,7 +382,7 @@ formal_parameter_initialiser: ;; EMPTY
                             | T_EQUAL BRACK_BLOCK
                               (cons "array" $2)
                             | T_EQUAL T_CONSTANT_ENCAPSED_STRING
-                              (cons "string" $2)
+                              (cons "string" (substring $2 1 -1))
                             | T_EQUAL T_NUMBER
                               (cons "number" $2)
                             ;
