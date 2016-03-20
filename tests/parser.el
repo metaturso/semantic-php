@@ -118,6 +118,39 @@ buffer with a single namespace."
                             :type "string"
                             :default-value "hello")
               (nth 2 consts)))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "CONST_STR_D" 'variable
+                            :constant-flag t
+                            :namespace "NsName"
+                            :type "string"
+                            :default-value "hello")
+              (nth 3 consts)))
+
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "CONST_BOOL_T" 'variable
+                            :constant-flag t
+                            :namespace "NsName"
+                            :type "boolean"
+                            :default-value "true")
+              (nth 4 consts)))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "CONST_BOOL_F" 'variable
+                            :constant-flag t
+                            :namespace "NsName"
+                            :type "boolean"
+                            :default-value "false")
+              (nth 5 consts)))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "CONST_NULL" 'variable
+                            :constant-flag t
+                            :namespace "NsName"
+                            :type "null"
+                            :default-value "null")
+              (nth 6 consts)))
      )
    )
   )

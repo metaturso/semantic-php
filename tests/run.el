@@ -21,6 +21,19 @@
 
 (load (concat semantic-php-project-root "php-mode/php-mode.el"))
 
+(require 'semantic)
+(require 'semantic/grammar)
+
+(defun semantic-php-recompile-grammar nil
+  "Recompiles the grammar before running the tests."
+  (with-temp-buffer
+    (message "Recompiling semantic-php grammar...")
+    (find-file (concat semantic-php-project-root "grammar.wy"))
+    (semantic-mode 1)
+    (semantic-grammar-create-package)))
+
+(semantic-php-recompile-grammar)
+
 (require 'php-mode)
 (require 'grammar-setup)
 (require 'test)
