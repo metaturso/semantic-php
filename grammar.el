@@ -3,7 +3,7 @@
 ;; Copyright (C) 2016 Andrea Turso
 
 ;; Author: Andrea Turso <trashofmasters@gmail.com>
-;; Created: 2016-03-14 05:04:11+0000
+;; Created: 2016-03-20 02:04:44+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -211,14 +211,22 @@
          (wisent-raw-tag
           (semantic-tag $5 'using :type
                         (wisent-raw-tag
-                         (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t)))))
+                         (semantic-tag-new-type $3 $2
+                                                (list
+                                                 (wisent-raw-tag
+                                                  (semantic-tag-new-type $3 $2 nil nil)))
+                                                nil :kind 'alias :prototype t)))))
         ((T_USE use_type qualified_name T_SEMICOLON)
          (wisent-raw-tag
           (semantic-tag
            (semantic-php-name-nonnamespace $3)
            'using :type
            (wisent-raw-tag
-            (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t))))))
+            (semantic-tag-new-type $3 $2
+                                   (list
+                                    (wisent-raw-tag
+                                     (semantic-tag-new-type $3 $2 nil nil)))
+                                   nil :kind 'alias :prototype t))))))
        (use_type
         ((T_CONST)
          (identity "variable"))
@@ -548,7 +556,7 @@
 (define-lex-analyzer grammar-lex-ns-block
   "Detects namespace blocks enclosed with non-braced namespace
 declarations."
-  (looking-at "^namespace .+;")
+  (looking-at "namespace\\s-+\\(\\(\\\\?\\w+\\)+\\)\\s-*;")
 
   (semantic-lex-push-token
    (semantic-lex-token
@@ -559,9 +567,10 @@ declarations."
   (semantic-lex-push-token
    (semantic-lex-token
     'T_STRING
-    (+ 1 (match-beginning 0) (length "namespace"))
-    (1- (match-end 0))))
+    (match-beginning 1)
+    (match-end 1)))
 
+  ;; Move the point forward to avoid infinite parsing loops.
   (search-forward ";")
 
   (semantic-lex-push-token
@@ -570,7 +579,7 @@ declarations."
     (match-end 0)
     (save-excursion
       (semantic-lex-unterminated-syntax-protection 'S_NS_SCOPE
-        (re-search-forward "^namespace .+;\\|\\'")
+        (re-search-forward "namespace\\s-+\\(\\\\?\\w+\\)+\\s-*;\\|\\'")
         (setq semantic-lex-end-point (point))
         (match-beginning 0)))))
   nil)

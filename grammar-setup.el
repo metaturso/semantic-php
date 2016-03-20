@@ -329,6 +329,7 @@ it's resolving a name used in a parameter or return type hint, an assignment,
 but not a use statement."
   (let ((scopetypes (oref scope scopetypes))
         currentns namespaces typename result importrules)
+
     (when (and (semantic-tag-p type-declaration)
                (semantic-tag-of-class-p type-declaration 'metatype))
       (setq typename (semantic-analyze-split-name (semantic-tag-name type-declaration)))

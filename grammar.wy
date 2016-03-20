@@ -121,12 +121,6 @@ grammar:
 ;; bovine-inner-scope
 local_variables:
     T_VARIABLE local_variable_initialiser
- ;; NOTE experimenting with variable typing. Now I'm using an alias to
- ;; inform Semantic the type of this variable is some other tag.
- ;;
- ;; TODO figure out the difference between name and definition of an
- ;; alias tag.
- ;; (VARIABLE-TAG $1 (ALIAS-TAG (car $2) 'using nil) (cdr $2))
     (VARIABLE-TAG $1 (TAG (car $2) 'metatype) (cdr $2))
   ;
 
@@ -222,24 +216,23 @@ namespace_subparts:
 ;; In PHP we want the use declarations to behave both as the definition
 ;; of a new symbol and as an include statement.
 ;;
-;; NOTE The namespace :type cannot be discerned from a class at parse
-;; time but it's easy to determine with a call to the filesystem when
-;; a directory can be found matching qualified symbol name, then we
-;; know it must be a namespace.
-;;
-;; Structure of the generated tag:
-;;
-;; (USING imported-type-name :type (TYPE fq-type-name (TYPE fq-type-name*)))
-;;
-;; *Q: At this point I'm not sure how useful is to redeclare TYPE as a
-;; member of TYPE, but I'll keep it for consistency with C++.
+;; NOTE use_type indicates the type of symbol being imported, this can
+;; be: constant, function, class, interface, trait, and namespace.
+;; For all intents and purposes class, interface and trait are handled
+;; uniformly. Unfortunately class and namespace imports cannot be
+;; discerned from one another at parse time, and the best place for
+;; doing this is in `< REMEMBER : insert function here>'
 use_declaration:
     T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
-    (TAG $5 'using :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
-    ;; (TAG $5 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG $5 'using
+         :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
+    ;; (TAG $5 'using
+    ;;      :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   | T_USE use_type qualified_name T_SEMICOLON
-    (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
-    ;; (TAG (semantic-php-name-nonnamespace $3) 'using :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG (semantic-php-name-nonnamespace $3) 'using
+         :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
+    ;; (TAG (semantic-php-name-nonnamespace $3) 'using
+    ;;      :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   ;
 
 use_type:
@@ -504,7 +497,7 @@ interface_method_declaration:
 (define-lex-analyzer grammar-lex-ns-block
   "Detects namespace blocks enclosed with non-braced namespace
 declarations."
-  (looking-at "^namespace .+;")
+  (looking-at "namespace\\s-+\\(\\(\\\\?\\w+\\)+\\)\\s-*;")
 
   (semantic-lex-push-token
    (semantic-lex-token
@@ -515,9 +508,10 @@ declarations."
   (semantic-lex-push-token
    (semantic-lex-token
     'T_STRING
-    (+ 1 (match-beginning 0) (length "namespace"))
-    (1- (match-end 0))))
+    (match-beginning 1)
+    (match-end 1)))
 
+  ;; Move the point forward to avoid infinite parsing loops.
   (search-forward ";")
 
   (semantic-lex-push-token
@@ -526,7 +520,7 @@ declarations."
     (match-end 0)
     (save-excursion
       (semantic-lex-unterminated-syntax-protection 'S_NS_SCOPE
-        (re-search-forward "^namespace .+;\\|\\'")
+        (re-search-forward "namespace\\s-+\\(\\\\?\\w+\\)+\\s-*;\\|\\'")
         (setq semantic-lex-end-point (point))
         (match-beginning 0)))))
   nil)
