@@ -24,4 +24,15 @@ opening tag, and evaluates BODY there."
      (let ((buffer-tags (semantic-fetch-tags)))
        ,@body)))
 
-(provide 'test)
+(defun imported-type-names (tag)
+  "Extracts the name and type of symbol imported with a php use
+declaration. The return list is in the form: (local symbol name
+or alias, fully qualified symbol name, imported symbol type).
+
+If TAG is not a using tag nil is returned."
+  (when (semantic-tag-of-class-p tag 'using)
+    (list (semantic-tag-name tag)
+          (semantic-tag-name (semantic-tag-type tag))
+          (semantic-tag-type (semantic-tag-type tag)))))
+
+(provide 'support-functions)

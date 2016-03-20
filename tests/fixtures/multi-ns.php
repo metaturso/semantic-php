@@ -2,27 +2,39 @@
 
 namespace FirstNs;
 
-class SomeClass
+class ClassName
 {
     public function __construct()
     {
     }
 }
 
-namespace SecondNs;
-
-class SomeClass
+class FirstClass
 {
-    public function __construct()
-    {
-    }
 }
 
 namespace FirstNs\SubNs;
 
-class SomeClass
+class ClassName
 {
     public function __construct()
     {
     }
+}
+
+class FirstSubClass
+{
+}
+
+namespace LastNs;
+
+class ClassName
+{
+    public function __construct()
+    {
+    }
+}
+
+class LastClass
+{
 }

@@ -3,7 +3,7 @@
 ;; Copyright (C) 2016 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2016-03-20 16:25:49+0000
+;; Created: 2016-03-20 17:17:21+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -280,6 +280,7 @@
 	 nil)
 	((block)
 	 nil)
+	((const_declaration))
 	((method_declaration))
 	((attribute_declaration)))
        (attribute_declaration

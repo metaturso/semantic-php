@@ -294,6 +294,7 @@ class_member_declaration:
     ()
   | block
     ()
+  | const_declaration
   | method_declaration
   | attribute_declaration
   ;

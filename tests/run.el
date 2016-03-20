@@ -18,7 +18,6 @@
 
 (add-to-list 'load-path semantic-php-project-root)
 (add-to-list 'load-path semantic-php-test-directory)
-
 (load (concat semantic-php-project-root "php-mode/php-mode.el"))
 
 (require 'semantic)
@@ -36,7 +35,7 @@
 
 (require 'php-mode)
 (require 'grammar-setup)
-(require 'test)
-(require 'parser)
+(require 'test-parser)
+(require 'test-analyser)
 
 (ert-run-tests-batch t)
