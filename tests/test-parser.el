@@ -77,21 +77,7 @@ buffer without any namespace."
    )
   )
 
-(ert-deftest semantic-php-test-class-extends nil
-  "Tests that a class can access methods in its lineage."
-  (with-php-buffer
-   (concat
-    "class ParentClass {}"
-    "class ChildClass extends ParentClass {}")
-   (pp buffer-tags)
-   (let ((parentclass (nth 0 buffer-tags))
-         (childclass (nth 1 buffer-tags)))
-
-     (should (equal "ParentClass" (car (semantic-tag-type-superclasses childclass)))))
-   )
-  )
-
-(ert-deftest semantic-php-test-class-implements nil
+(ert-deftest semantic-php-test-parser-class-implements nil
   ""
   (with-php-buffer
    (concat
@@ -109,7 +95,7 @@ buffer without any namespace."
    )
   )
 
-(ert-deftest semantic-php-test-class-extends nil
+(ert-deftest semantic-php-test-parser-class-implements nil
   ""
   (with-php-buffer
    (concat
@@ -122,7 +108,104 @@ buffer without any namespace."
    (should (equal "Ns\\SecondIface"
                   (nth 1 (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces))))
    )
-)
+  )
+
+(ert-deftest semantic-php-test-parser-class-methods-protection nil
+  ""
+  (with-php-buffer
+   (concat
+    "class ClassName {"
+    "  public function pubFun() {}"
+    "  private function priFun() {}"
+    "  protected function proFun() {}"
+    "}")
+   (let ((members (semantic-tag-type-members (first buffer-tags))))
+     (should (equal 'public (semantic-tag-protection (nth 0 members))))
+     (should (equal 'private (semantic-tag-protection (nth 1 members))))
+     (should (equal 'protected (semantic-tag-protection (nth 2 members))))
+     )
+   )
+  )
+
+(ert-deftest semantic-php-test-parser-class-methods-protection-abstract-first nil
+  ""
+  (with-php-buffer
+   (concat
+    "class ClassName {"
+    "  abstract public function pubFun();"
+    "  abstract private function priFun();"
+    "  abstract protected function proFun();"
+    "  abstract static public function stPubFun();"
+    "  abstract static private function stPriFun();"
+    "  abstract static protected function stProFun();"
+    "}")
+   (let ((members (semantic-tag-type-members (first buffer-tags))))
+     ;; abstract <access_modifier>
+     (should (equal 'public (semantic-tag-protection (nth 0 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 0 members))))
+
+     (should (equal 'private (semantic-tag-protection (nth 1 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 1 members))))
+
+     (should (equal 'protected (semantic-tag-protection (nth 2 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 2 members))))
+
+     ;; abstract static <access_modifier>
+     (should (equal 'public (semantic-tag-protection (nth 3 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 3 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 3 members))))
+
+     (should (equal 'private (semantic-tag-protection (nth 4 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 4 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 4 members))))
+
+     (should (equal 'protected (semantic-tag-protection (nth 5 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 5 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 5 members))))
+     )
+   )
+  )
+
+(ert-deftest semantic-php-test-parser-class-methods-protection-static-first nil
+  ""
+  ;; FIXME: Parsing of <access or stati> abstract ...
+  :expected-result :failed
+  (with-php-buffer
+   (concat
+    "class ClassName {"
+    "  static public function pubFun();"
+    "  static private function priFun();"
+    "  static protected function proFun();"
+    "  static abstract public function abPubFun();"
+    "  static abstract private function abPriFun();"
+    "  static abstract protected function abProFun();"
+    "}")
+   (let ((members (semantic-tag-type-members (first buffer-tags))))
+     ;; static <access_modifier>
+     (should (equal 'public (semantic-tag-protection (nth 0 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 0 members))))
+
+     (should (equal 'private (semantic-tag-protection (nth 1 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 1 members))))
+
+     (should (equal 'protected (semantic-tag-protection (nth 2 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 2 members))))
+
+     ;; static abstract <access_modifier>
+     (should (equal 'public (semantic-tag-protection (nth 3 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 3 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 3 members))))
+
+     (should (equal 'private (semantic-tag-protection (nth 4 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 4 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 4 members))))
+
+     (should (equal 'protected (semantic-tag-protection (nth 5 members))))
+     (should (member "static" (semantic-tag-modifiers (nth 5 members))))
+     (should (member "abstract" (semantic-tag-modifiers (nth 5 members))))
+     )
+   )
+  )
 
 ;; Namespaces
 (ert-deftest semantic-php-test-parser-namespace-constants nil

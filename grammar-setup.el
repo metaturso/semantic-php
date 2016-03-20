@@ -23,16 +23,10 @@ This function returns on of the following symbols:
    'public    - Anyone can access this TAG.
    'private   - Only methods in the local scope can access TAG.
    'protected - Like private for outside scopes, like public for child
-                classes.
-
-This is overridden to avoid interaction with Semantic C and PHP."
-  (cond
-   ((member "public" (semantic-tag-modifiers tag))
-    'public)
-   ((member "private" (semantic-tag-modifiers tag))
-    'private)
-   ((member "protected" (semantic-tag-modifiers tag))
-    'protected)))
+                classes."
+  (car-safe (or (member 'public (semantic-tag-modifiers tag))
+                (member 'private (semantic-tag-modifiers tag))
+                (member 'protected (semantic-tag-modifiers tag)))))
 
 (define-mode-local-override semantic-tag-alias-definition php-mode (tag)
   "Return the definition TAG is an alias.

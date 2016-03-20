@@ -336,7 +336,7 @@ method_declaration:
     (FUNCTION-TAG (car $2) (TAG $4 'metatype) (cdr $2) :typemodifiers $1)
   | method_opt function_declarator function_body
     (FUNCTION-TAG (car $2) "mixed" (cdr $2) :typemodifiers $1)
-                  ;
+  ;
 
 function_declaration:
     function_declarator T_COLON function_return_type_hint function_body
@@ -351,8 +351,13 @@ function_declarator: T_FUNCTION T_STRING formal_parameter_list
 
 ;; NOTE Don't use public visibility by default as this creates
 ;; ambiguity with functions.
-method_opt: static_or_access_modifiers
-          ;
+method_opt:
+    T_ABSTRACT static_or_access_modifiers
+    (cons "abstract" $2)
+  | static_or_access_modifiers T_ABSTRACT
+    (cons "abstract" $1)
+  | static_or_access_modifiers
+  ;
 
 function_body: T_SEMICOLON
              | block
@@ -389,8 +394,11 @@ formal_parameter_initialiser: ;; EMPTY
                             ;
 
 access_modifier: T_PUBLIC
+                 (identity 'public)
                | T_PROTECTED
+                 (identity 'protected)
                | T_PRIVATE
+                 (identity 'private)
                ;
 
 type_hint:
@@ -458,9 +466,9 @@ qualified_name_list: qualified_name_list T_COMMA qualified_name
 
 static_or_access_modifiers:
     T_STATIC access_modifier
-    (list $1 $2)
+    (list "static" $2)
   | access_modifier T_STATIC
-    (list $2 $1)
+    (list "static" $1)
   | access_modifier
     (list $1)
   ;
