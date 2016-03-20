@@ -1,0 +1,14 @@
+{
+    "name": "aturso/semantic-php",
+    "description": "PHP Intellisense for Emacs",
+    "require-dev": {
+        "zendframework/zend-code": "*"
+    },
+    "authors": [
+        {
+            "name": "Andrea Turso",
+            "email": "trashofmasters@gmail.com"
+        }
+    ],
+    "require": {}
+}
