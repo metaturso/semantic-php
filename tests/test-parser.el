@@ -23,12 +23,13 @@
 ;; - [x] namespace declaration
 ;; - [ ] braced namespace declaration
 ;; - [x] namespace constant
-;; - [ ] class constant
+;; - [x] class constants
 
 (require 'semantic/tag)
 (require 'semantic/tag-ls)
 (require 'support-functions)
 
+;; Classes
 (ert-deftest semantic-php-test-parser-class nil
   "Tests the production of tags for class declarations inside a
 buffer without any namespace."
@@ -76,145 +77,54 @@ buffer without any namespace."
    )
   )
 
-(ert-deftest semantic-php-test-parser-class-single-namespace nil
-  "Tests the production of tags for class declarations inside a
-buffer with a single namespace."
+(ert-deftest semantic-php-test-class-extends nil
+  "Tests that a class can access methods in its lineage."
   (with-php-buffer
-   "namespace NsName; class ClassName {}"
+   (concat
+    "class ParentClass {}"
+    "class ChildClass extends ParentClass {}")
+   (pp buffer-tags)
+   (let ((parentclass (nth 0 buffer-tags))
+         (childclass (nth 1 buffer-tags)))
 
-   ;; the top-level tag is the namespace.
-   (should (semantic-tag-similar-p
-            (semantic-tag "NsName" 'type :type "namespace")
-            (car buffer-tags)
-            :members))
-
-   ;; the namespace contains the class.
-   (should (semantic-tag-similar-p
-            (semantic-tag "ClassName" 'type :type "class" :namespace "NsName")
-            (car (semantic-tag-type-members
-                  (car buffer-tags)))))
+     (should (equal "ParentClass" (car (semantic-tag-type-superclasses childclass)))))
    )
   )
 
-(ert-deftest semantic-php-test-parser-class-multi-namespace nil
-  "Tests the production of multiple namespace tags in a buffer
-with consecutive namespace declarations."
-  (with-php-file
-   "multi-ns.php"
-   (let (currentns)
-     ;; 1) Check the namespace tag.
-     ;; 2) Class with the same name across multiple namespace.
-     ;; 3) Class with unique name.
-
-     ;; 1 Simple namespace declaration.
-     (should (semantic-tag-similar-p
-              (semantic-tag "FirstNs" 'type :type "namespace")
-              (setq currentns (nth 0 buffer-tags))
-              :members))
-
-     ;; 2
-     (should (semantic-tag-similar-p
-              (semantic-tag "ClassName" 'type :type "class" :namespace "FirstNs")
-              (nth 0 (semantic-tag-type-members currentns))
-              :members))
-
-     ;; 3
-     (should (semantic-tag-similar-p
-              (semantic-tag "FirstClass" 'type :type "class" :namespace "FirstNs")
-              (nth 1 (semantic-tag-type-members currentns))
-              :members))
-
-     ;; 1 Sub-namespace declarations.
-     (should (semantic-tag-similar-p
-              (semantic-tag "FirstNs\\SubNs" 'type :type "namespace")
-              (setq currentns (nth 1 buffer-tags))
-              :members))
-
-     ;; 2
-     (should (semantic-tag-similar-p
-              (semantic-tag "ClassName" 'type :type "class" :namespace "FirstNs\\SubNs")
-              (nth 0 (semantic-tag-type-members currentns))
-              :members))
-
-     ;; 3
-     (should (semantic-tag-similar-p
-              (semantic-tag "FirstSubClass" 'type :type "class" :namespace "FirstNs\\SubNs")
-              (nth 1 (semantic-tag-type-members currentns))
-              :members))
-
-     ;; 1 Check the last namespace in the buffer.
-     (should (semantic-tag-similar-p
-              (semantic-tag "LastNs" 'type :type "namespace")
-              (setq currentns (nth 2 buffer-tags))
-              :members))
-
-     ;; 2
-     (should (semantic-tag-similar-p
-              (semantic-tag "ClassName" 'type :type "class" :namespace "LastNs")
-              (nth 0 (semantic-tag-type-members currentns))
-              :members))
-
-     ;; 3
-     (should (semantic-tag-similar-p
-              (semantic-tag "LastClass" 'type :type "class" :namespace "LastNs")
-              (nth 1 (semantic-tag-type-members currentns))
-              :members))
-     )
-   )
-  )
-
-(ert-deftest semantic-php-test-use-class nil
+(ert-deftest semantic-php-test-class-implements nil
   ""
   (with-php-buffer
-   "use DateTime; use Ns\\SubNs\\ClassName;"
-   (let ((imports (semantic-find-tags-by-class 'using buffer-tags))
-         (includes (semantic-find-tags-by-class 'include buffer-tags)))
+   (concat
+    "class ChildClass extends ParentClass {}"
+    "class ExceptionName extends \\Exception {}"
+    "class ClassName extends Ns\\SubNs\\ClassName {}")
+   (should (equal "ParentClass"
+                  (car (semantic-tag-type-superclasses (nth 0 buffer-tags)))))
 
-     (should (equal
-              (list "DateTime" "DateTime" "class")
-              (imported-type-names (nth 0 imports))))
+   (should (equal "\\Exception"
+                  (car (semantic-tag-type-superclasses (nth 1 buffer-tags)))))
 
-     (should (semantic-tag-similar-p
-              (semantic-tag "DateTime" 'include)
-              (nth 0 includes)))
-
-     (should (equal
-              (list "ClassName" "Ns\\SubNs\\ClassName" "class")
-              (imported-type-names (nth 1 imports))))
-
-     (should (semantic-tag-similar-p
-              (semantic-tag "Ns\\SubNs\\ClassName" 'include)
-              (nth 1 includes)))
-     )
+   (should (equal "Ns\\SubNs\\ClassName"
+                  (car (semantic-tag-type-superclasses (nth 2 buffer-tags)))))
    )
   )
 
-(ert-deftest semantic-php-test-use-class-with-alias nil
+(ert-deftest semantic-php-test-class-extends nil
   ""
   (with-php-buffer
-   "use DateTime as Date; use Ns\\SubNs\\ClassName as Name;"
-   (let ((imports (semantic-find-tags-by-class 'using buffer-tags))
-         (includes (semantic-find-tags-by-class 'include buffer-tags)))
-
-     (should (equal
-              (list "Date" "DateTime" "class")
-              (imported-type-names (nth 0 imports))))
-
-     (should (semantic-tag-similar-p
-              (semantic-tag "DateTime" 'include)
-              (nth 0 includes)))
-
-     (should (equal
-              (list "Name" "Ns\\SubNs\\ClassName" "class")
-              (imported-type-names (nth 1 imports))))
-
-     (should (semantic-tag-similar-p
-              (semantic-tag "Ns\\SubNs\\ClassName" 'include)
-              (nth 1 includes)))
-     )
+   (concat
+    "class Date implements \\DateTimeImmutable {}"
+    "class ClassName implements FirstIface, Ns\\SecondIface {}")
+   (should (equal "\\DateTimeImmutable"
+                  (nth 0 (semantic-tag-get-attribute (nth 0 buffer-tags) :interfaces))))
+   (should (equal "FirstIface"
+                  (nth 0 (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces))))
+   (should (equal "Ns\\SecondIface"
+                  (nth 1 (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces))))
    )
-  )
+)
 
+;; Namespaces
 (ert-deftest semantic-php-test-parser-namespace-constants nil
   "Tests the production of tags for namespace constants"
   (with-php-buffer
@@ -297,6 +207,146 @@ with consecutive namespace declarations."
                             :type "null"
                             :default-value "null")
               (nth 6 consts)))
+     )
+   )
+  )
+
+(ert-deftest semantic-php-test-parser-class-inside-single-namespace nil
+  "Tests the production of tags for class declarations inside a
+buffer with a single namespace."
+  (with-php-buffer
+   "namespace NsName; class ClassName {}"
+
+   ;; the top-level tag is the namespace.
+   (should (semantic-tag-similar-p
+            (semantic-tag "NsName" 'type :type "namespace")
+            (car buffer-tags)
+            :members))
+
+   ;; the namespace contains the class.
+   (should (semantic-tag-similar-p
+            (semantic-tag "ClassName" 'type :type "class" :namespace "NsName")
+            (car (semantic-tag-type-members
+                  (car buffer-tags)))))
+   )
+  )
+
+(ert-deftest semantic-php-test-parser-classes-inside-many-namespaces nil
+  "Tests the production of multiple namespace tags in a buffer
+with consecutive namespace declarations."
+  (with-php-file
+   "multi-ns.php"
+   (let (currentns)
+     ;; 1) Check the namespace tag.
+     ;; 2) Class with the same name across multiple namespace.
+     ;; 3) Class with unique name.
+
+     ;; 1 Simple namespace declaration.
+     (should (semantic-tag-similar-p
+              (semantic-tag "FirstNs" 'type :type "namespace")
+              (setq currentns (nth 0 buffer-tags))
+              :members))
+
+     ;; 2
+     (should (semantic-tag-similar-p
+              (semantic-tag "ClassName" 'type :type "class" :namespace "FirstNs")
+              (nth 0 (semantic-tag-type-members currentns))
+              :members))
+
+     ;; 3
+     (should (semantic-tag-similar-p
+              (semantic-tag "FirstClass" 'type :type "class" :namespace "FirstNs")
+              (nth 1 (semantic-tag-type-members currentns))
+              :members))
+
+     ;; 1 Sub-namespace declarations.
+     (should (semantic-tag-similar-p
+              (semantic-tag "FirstNs\\SubNs" 'type :type "namespace")
+              (setq currentns (nth 1 buffer-tags))
+              :members))
+
+     ;; 2
+     (should (semantic-tag-similar-p
+              (semantic-tag "ClassName" 'type :type "class" :namespace "FirstNs\\SubNs")
+              (nth 0 (semantic-tag-type-members currentns))
+              :members))
+
+     ;; 3
+     (should (semantic-tag-similar-p
+              (semantic-tag "FirstSubClass" 'type :type "class" :namespace "FirstNs\\SubNs")
+              (nth 1 (semantic-tag-type-members currentns))
+              :members))
+
+     ;; 1 Check the last namespace in the buffer.
+     (should (semantic-tag-similar-p
+              (semantic-tag "LastNs" 'type :type "namespace")
+              (setq currentns (nth 2 buffer-tags))
+              :members))
+
+     ;; 2
+     (should (semantic-tag-similar-p
+              (semantic-tag "ClassName" 'type :type "class" :namespace "LastNs")
+              (nth 0 (semantic-tag-type-members currentns))
+              :members))
+
+     ;; 3
+     (should (semantic-tag-similar-p
+              (semantic-tag "LastClass" 'type :type "class" :namespace "LastNs")
+              (nth 1 (semantic-tag-type-members currentns))
+              :members))
+     )
+   )
+  )
+
+;; Use statements and tag expansion
+(ert-deftest semantic-php-test-tag-expansion-use-class nil
+  ""
+  (with-php-buffer
+   "use DateTime; use Ns\\SubNs\\ClassName;"
+   (let ((imports (semantic-find-tags-by-class 'using buffer-tags))
+         (includes (semantic-find-tags-by-class 'include buffer-tags)))
+
+     (should (equal
+              (list "DateTime" "DateTime" "class")
+              (imported-type-names (nth 0 imports))))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "DateTime" 'include)
+              (nth 0 includes)))
+
+     (should (equal
+              (list "ClassName" "Ns\\SubNs\\ClassName" "class")
+              (imported-type-names (nth 1 imports))))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "Ns\\SubNs\\ClassName" 'include)
+              (nth 1 includes)))
+     )
+   )
+  )
+
+(ert-deftest semantic-php-test-tag-expansion-use-class-with-alias nil
+  ""
+  (with-php-buffer
+   "use DateTime as Date; use Ns\\SubNs\\ClassName as Name;"
+   (let ((imports (semantic-find-tags-by-class 'using buffer-tags))
+         (includes (semantic-find-tags-by-class 'include buffer-tags)))
+
+     (should (equal
+              (list "Date" "DateTime" "class")
+              (imported-type-names (nth 0 imports))))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "DateTime" 'include)
+              (nth 0 includes)))
+
+     (should (equal
+              (list "Name" "Ns\\SubNs\\ClassName" "class")
+              (imported-type-names (nth 1 imports))))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "Ns\\SubNs\\ClassName" 'include)
+              (nth 1 includes)))
      )
    )
   )
