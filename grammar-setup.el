@@ -24,9 +24,12 @@ This function returns on of the following symbols:
    'private   - Only methods in the local scope can access TAG.
    'protected - Like private for outside scopes, like public for child
                 classes."
-  (car-safe (or (member 'public (semantic-tag-modifiers tag))
-                (member 'private (semantic-tag-modifiers tag))
-                (member 'protected (semantic-tag-modifiers tag)))))
+
+  (let ((access (or (member "public" (semantic-tag-modifiers tag))
+                    (member "private" (semantic-tag-modifiers tag))
+                    (member "protected" (semantic-tag-modifiers tag)))))
+    (if access
+      (intern (car access)))))
 
 (define-mode-local-override semantic-tag-alias-definition php-mode (tag)
   "Return the definition TAG is an alias.

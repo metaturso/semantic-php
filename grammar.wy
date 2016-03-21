@@ -394,11 +394,8 @@ formal_parameter_initialiser: ;; EMPTY
                             ;
 
 access_modifier: T_PUBLIC
-                 (identity 'public)
                | T_PROTECTED
-                 (identity 'protected)
                | T_PRIVATE
-                 (identity 'private)
                ;
 
 type_hint:
