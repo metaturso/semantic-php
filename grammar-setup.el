@@ -341,7 +341,7 @@ but not a use statement."
           ;; fully qualified (i.e. it does not begin with \\).
 
           (progn (setq typename (car (last typename)))
-                 (message "Preparing lookup up P_QN [%s] in SCOPE imported types." typename)
+                 (message "Preparing lookup up P_QN [%s] in scope." typename)
                  (setq namespaces (semantic-find-tags-by-class 'type scopetypes))
                  (setq namespaces (remove nil
                              (mapcar (lambda (ct)
@@ -349,7 +349,7 @@ but not a use statement."
                                      namespaces))))
 
         ;; So we only have to search one namespace.
-        (message "Preparing lookup of F_QN [%s] in TYPECACHE." (car typename))
+        (message "Preparing lookup of F_QN [%s] in typecache." (car typename))
         (error "^ FIXME unchecked path.")
         (setq namespaces (semanticdb-typecache-find typename))
 

@@ -3,6 +3,8 @@
 
 %languagemode php-mode
 
+%use-macros grammar-macro { NAMESPACE }
+
 %type  <number>
 %token <number> T_NUMBER
 
@@ -112,7 +114,11 @@
 ;; NOTE: Remember to keep namespace_subparts
 grammar:
     namespace_declaration
-  | use_declaration
+  | global_namespace
+  ;
+
+global_namespace:
+    use_declaration
   | class_declaration
   | function_declaration
   | interface_declaration
@@ -141,43 +147,7 @@ local_variable_initialiser:
 
 namespace_declaration:
     T_NAMESPACE qualified_name namespace_body
- ;; NOTE I'm not using the tags' `parent' attribute to avoid having to
- ;; mess about with method definitions. Plus, I set this attribute to
- ;; the namespace type tag ecb-sync-tags breaks, probably because of
- ;; circular references in the data.
- ;;
- ;; TODO Exclude variables without the :constant-flag.
- ;; TODO Macro this.
-    (let ((namespace (TYPE-TAG $2 "namespace" nil nil)) members)
-      ;; Create the `namespace' 'type tag and set it across
-      ;; all the top level tags
-      (dolist (tag $3 members)
-        ;; We don't do anything on includes and using tags because we
-        ;; don't want to qualify their name! Namespaces are also
-        ;; ignored, but because they shouldn't appear nested in the
-        ;; first place.
-        ;;
-        ;; On all other tags we set the `namespace' attribute and
-        ;; qualify their name.
-        ;; (message "Is current tag of class '(include using namespace alias)? [%s, %s]"
-        ;;          (semantic-tag-class tag)
-        ;;          (if (memq (semantic-tag-class tag) '(include using namespace alias)) "yes" "no"))
-
-        (unless (memq (semantic-tag-class tag) '(include using namespace alias))
-          ;; the name should be aliased iff:
-          ;; 1. we're not in the global namespace (which considering this code
-          ;; is inlined in the namespace rule we are not in)
-          ;;
-          ;; 2. the name is not fully qualified
-          ;;
-          ;; (semantic-tag-put-attribute tag :alias (ALIAS-TAG (car tag)
-          ;;            'type
-          ;;            (semantic-php--resolve-symbol-for-tag (car tag) $2)))
-
-          (semantic-tag-put-attribute tag :namespace $2))
-        (setq members (cons tag members)))
-      (semantic-tag-put-attribute namespace :members (nreverse members))
-      namespace)
+    (NAMESPACE $2 $3)
   ;
 
 namespace_body:
