@@ -25,6 +25,7 @@
 ;; - [x] namespace constant
 ;; - [x] class constants
 
+(require 'cl)
 (require 'semantic/tag)
 (require 'semantic/tag-ls)
 (require 'support-functions)
