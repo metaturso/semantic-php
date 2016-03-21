@@ -254,19 +254,41 @@ that may or may not have a name.)"
          (tagstable (or currentns (current-buffer)))
          returntags)
 
-    ;; 1. all types declared in namespaces within this buffer.
+    ;; 1. Types declared in namespaces within this buffer.
     (setq tmp (semantic-find-tags-by-class 'type tagstable))
     (setq tmp (semantic-find-tags-by-type "namespace" tmp))
     (setq returntags tmp)
     ;; (message "semantic-ctxt-scoped-types: namespaces in this file [%s]" tmp)
 
     ;; 2. Types imported and aliased with using.
+    ;; The tagstable is flattened since using tags are produced
+    ;; inside namespaces as well.
     (setq tmp (semantic-find-tags-by-class 'using (semantic-flatten-tags-table tagstable)))
     (setq returntags
           (append returntags
                   (mapcar 'semantic-tag-type tmp)))
-
     ;; (message "semantic-ctxt-scoped-types: types imported in this file [%s]" (mapcar 'semantic-tag-type tmp))
+
+    ;; 3. Types that may be declared in the global scope.
+    ;; TODO only do this if not in a namespace?
+    ;; a) classes, interfaces, and traits
+    (setq tmp (semantic-find-tags-by-class 'type tagstable))
+
+    ;; >>> NOTE FIXME TODO NEXT <<<
+    ;; Apparently classes with an empty body aren't showing up
+    ;; in the result. Trying to figure this out.
+    (message "classes")
+
+    ;; a) classes, interfaces, and traits
+    (setq returntags
+          (append returntags
+                  (semantic-find-tags-by-type "class" tmp)))
+
+    ;; b) functions
+    (setq returntags
+          (append returntags
+                  (semantic-find-tags-by-class 'function tagstable)))
+
     returntags))
 
 (define-mode-local-override semantic-analyze-dereference-metatype php-mode
@@ -330,16 +352,16 @@ but not a use statement."
       ;; namespace part of a partially qualified name.
       (if (or (null (car typename))
               (not (string-match-p "^\\\\\\w+" (car typename))))
+
           ;; Name not qualified at all, or its namespace part is not
           ;; fully qualified (i.e. it does not begin with \\).
-
           (progn (setq typename (car (last typename)))
-                 (message "Preparing lookup up P_QN [%s] in scope." typename)
+                 ;; (message "Preparing lookup up P_QN [%s] in scope." typename)
                  (setq namespaces (semantic-find-tags-by-class 'type scopetypes))
                  (setq namespaces (remove nil
-                             (mapcar (lambda (ct)
-                                       (if (equal (semantic-tag-type ct) "namespace") ct))
-                                     namespaces))))
+                                          (mapcar (lambda (ct)
+                                                    (if (equal (semantic-tag-type ct) "namespace") ct))
+                                                  namespaces))))
 
         ;; So we only have to search one namespace.
         (message "Preparing lookup of F_QN [%s] in typecache." (car typename))
@@ -357,21 +379,29 @@ but not a use statement."
         (while (and namespaces
                     (null result))
           (setq currentns (car namespaces))
-
-          (setq result (semantic-php-dereference-imported-type type-declaration currentns))
+          ;; (message "semantic-php-dereference-metatype: Checking type in namespace [%s]" type-declaration)
+          (setq result (semantic-php-dereference-type-in-namespace type-declaration currentns))
 
           (unless result
+            (message "semantic-php-dereference-metatype: Search in namespace failed, trying entire buffer")
+            ;; If the previous search failed the point could be in the
+            ;; global namespace, so we repeat the search this time
+            ;; across the entire buffer.
+            ;;
+            ;; TODO this logic can be greatly improved to reduce the
+            ;; number of lookups.
             (unless importrules
+              ;;
               (setq importrules (semantic-flatten-tags-table (current-buffer)))
               (setq importrules (remove nil
                                         (mapcar (lambda (ct)
                                                   (if (semantic-tag-of-class-p ct 'using) ct))
                                                   importrules))))
             (message "semantic-php-dereference-metatype: Checking imported name [%s]" typename)
-            (setq result (semantic-php-dereference-import-rules typename importrules)))
+            (setq result (semantic-php-dereference-type-import-rules typename importrules)))
 
-          (unless result
-              (message "semantic-php-dereference-metatype: No matches yet [%s]" typename))
+          ;; (unless result
+          ;;     (message "semantic-php-dereference-metatype: No matches yet [%s]" typename))
 
           (setq namespaces (cdr namespaces))
         )
@@ -381,64 +411,79 @@ but not a use statement."
         (list result result)
       (list type type-declaration))))
 
-(defun semantic-php-dereference-imported-type (type namespace)
+(defun semantic-php-dereference-type-in-namespace (type namespace)
   "Finds the concrete type matching TYPE the import rules in NAMESPACE.
 This is not a dereferencer in and on itself, rather a support
 a dereferencer function."
+
   (let ((typename (semantic-analyze-split-name (semantic-tag-name type)))
         (table (semantic-flatten-tags-table namespace))
         localname importname importtype importfound)
 
-    ;; NOTE this is a nace way of dequalifying the name, which
+    ;; NOTE this is a nice way of dequalifying the name, which
     ;; I think I should reuse wherever I used (car (last name))
     (when (listp (setq localname (semantic-analyze-split-name
                                   (semantic-tag-name type))))
       (setq localname (car (last localname))))
+    (setq importrules (semantic-find-tags-by-class 'using table))
 
-    (setq importrules (semantic-find-tags-by-name localname table))
-    (setq importrules (remove nil (mapcar
-                                   (lambda (ct)
-                                     (if (semantic-tag-of-class-p ct 'using)
-                                         ct))
-                                   importrules)))
+    (semantic-php-dereference-type-import-rules localname importrules)))
 
-    (semantic-php-dereference-import-rules localname importrules)))
-
-(defun semantic-php-dereference-import-rules (localname importrules)
+(defun semantic-php-dereference-type-import-rules (localname importrules)
   "Finds the concrete type matching TYPE in IMPORTRULES.
 This is not a dereferencer in and on itself, rather a support
 a dereferencer function."
   (let (importname importtype importfound)
     (while (and (null importfound) importrules)
       (setq importname (semantic-analyze-split-name
-                        (semantic-tag-name (car importrules)))
-            importtype (semantic-tag-type (car importrules)))
+                        (semantic-tag-name
+                         (semantic-tag-type (car importrules))))
+            importtype (car importrules))
 
-      (message "Analysing [%s] against imported type [%s => %s (%s %s)]"
-               localname
-               importname
-               (car importtype)
-               (semantic-tag-class importtype)
-               (semantic-tag-type importtype))
+      ;; (message "Analysing [%s] against imported type [%s => %s (%s %s)]"
+      ;;          localname
+      ;;          importname
+      ;;          (car importtype)
+      ;;          (semantic-tag-class importtype)
+      ;;          (semantic-tag-type importtype))
 
       (unless (listp importname)
         (setq importname (list importname)))
 
       (if (and (equal localname (car (last importname)))
+               ;; TODO handle other types of imported types.
                (member (semantic-tag-type importtype) (list "class")))
-          (setq importfound importtype)
+          (progn
+            (message
+             "semantic-php-dereference-type-import-rules: found import [%s => %s]"
+             localname (car importtype))
+            (setq importfound importtype))
+
         (cond
          ((equal localname (car (last importname)))
-          (setq importfound (semanticdb-typecache-find (car (last importtype))))
+          (message
+           "semantic-php-dereference-type-import-rules: searching in database [%s]"
+           (car importtype))
+          ;; Search the fully qualified name in the database.
+          (setq importfound (semanticdb-typecache-find (semantic-tag-name importtype)))
 
           (if importfound
-              (message "semantic-php-dereference-import-rules: found import [%s => %s]" localname importname)
-            (message "semantic-php-dereference-import-rules: bail out, can't find [%s => %s]" localname importname))
+              (message
+               "semantic-php-dereference-type-import-rules: found import [%s => %s]"
+               localname (car importtype))
+            (message
+             "semantic-php-dereference-type-import-rules: bail out, can't find [%s => %s]"
+             localname (car importtype))) ;; debug output
           )
 
-         (t (message "semantic-php-dereference-import-rules: can't handle [%s => %s]" localname importname))))
+         (t
+          (message
+           "semantic-php-dereference-type-import-rules: can't handle [%s => %s]"
+           localname (car importtype)) ;; debug output
+          )
+        ))
       (setq importrules (cdr importrules)))
-    (message "semantic-php-dereference-import-rules: returning with [%s]" importfound)
+    (message "semantic-php-dereference-type-import-rules: returning with [%s]" importfound)
     importfound))
 
 (defun semantic-php-name-nonnamespace (name)
@@ -494,12 +539,12 @@ will produce the following tags:
   (let* ((type-tag (semantic-tag-get-attribute using-tag :type))
          ;; fq-type-name is the part after the PHP `use' keyword and
          ;; the following semicolon or `as' keyword.
-         (fq-type-name (semantic-tag-name type-tag))
+         (fq-type-name (semantic-tag-name using-tag))
          ;; local-type-name is collected by the parser and it's either
          ;; the last part of a qualified name, or the alias after the
          ;; PHP `as' keyword. This will be the name of the type in the
          ;; local scope.
-         (local-type-name (semantic-tag-name using-tag))
+         (local-type-name (semantic-php-name-nonnamespace (semantic-tag-name type-tag)))
          ;; actual-type-name is the last part of the fully
          ;; qualified name before the `as' keyword. We'll test this
          ;; value against local-type-name to know when imported types
@@ -525,6 +570,7 @@ will produce the following tags:
          ;; Produce a new `include' tag to hint Semantic of the external
          ;; dependency.
          (include-tag (semantic-tag-new-include fq-type-name nil)))
+    (message "Expanded using [%s => %s]" local-type-name fq-type-name)
     (semantic-tag-set-bounds include-tag (semantic-tag-start using-tag) (semantic-tag-end using-tag))
     (list using-tag include-tag alias-tag)))
 

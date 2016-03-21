@@ -31,8 +31,8 @@ or alias, fully qualified symbol name, imported symbol type).
 
 If TAG is not a using tag nil is returned."
   (when (semantic-tag-of-class-p tag 'using)
-    (list (semantic-tag-name tag)
-          (semantic-tag-name (semantic-tag-type tag))
+    (list (semantic-php-name-nonnamespace (semantic-tag-name (semantic-tag-type tag)))
+          (semantic-tag-name tag)
           (semantic-tag-type (semantic-tag-type tag)))))
 
 (provide 'support-functions)

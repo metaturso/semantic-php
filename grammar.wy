@@ -195,15 +195,11 @@ namespace_subparts:
 ;; doing this is in `< REMEMBER : insert function here>'
 use_declaration:
     T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
-    (TAG $5 'using
-         :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
-    ;; (TAG $5 'using
-    ;;      :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG $3 'using
+         :type (TYPE-TAG $5 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   | T_USE use_type qualified_name T_SEMICOLON
-    (TAG (semantic-php-name-nonnamespace $3) 'using
-         :type (TYPE-TAG $3 $2 nil nil :kind 'alias :prototype t))
-    ;; (TAG (semantic-php-name-nonnamespace $3) 'using
-    ;;      :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    (TAG $3 'using
+         :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
   ;
 
 const_declaration:

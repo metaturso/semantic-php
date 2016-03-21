@@ -25,6 +25,7 @@
 ;; - [x] namespace constant
 ;; - [x] class constants
 
+(require 'cl)
 (require 'semantic/tag)
 (require 'semantic/tag-ls)
 (require 'support-functions)
@@ -402,6 +403,10 @@ with consecutive namespace declarations."
               (imported-type-names (nth 1 imports))))
 
      (should (semantic-tag-similar-p
+              (semantic-tag "DateTime" 'include)
+              (nth 0 includes)))
+
+     (should (semantic-tag-similar-p
               (semantic-tag "Ns\\SubNs\\ClassName" 'include)
               (nth 1 includes)))
      )
@@ -411,7 +416,10 @@ with consecutive namespace declarations."
 (ert-deftest semantic-php-test-tag-expansion-use-class-with-alias nil
   ""
   (with-php-buffer
-   "use DateTime as Date; use Ns\\SubNs\\ClassName as Name;"
+   (concat
+    "use DateTime as Date;"
+    "use Ns\\SubNs\\ClassName as AliasedName;"
+    "use Ns\\SubNs\\SomeClass;")
    (let ((imports (semantic-find-tags-by-class 'using buffer-tags))
          (includes (semantic-find-tags-by-class 'include buffer-tags)))
 
@@ -424,12 +432,24 @@ with consecutive namespace declarations."
               (nth 0 includes)))
 
      (should (equal
-              (list "Name" "Ns\\SubNs\\ClassName" "class")
+              (list "AliasedName" "Ns\\SubNs\\ClassName" "class")
               (imported-type-names (nth 1 imports))))
+
+     (should (equal
+              (list "SomeClass" "Ns\\SubNs\\SomeClass" "class")
+              (imported-type-names (nth 2 imports))))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "DateTime" 'include)
+              (nth 0 includes)))
 
      (should (semantic-tag-similar-p
               (semantic-tag "Ns\\SubNs\\ClassName" 'include)
               (nth 1 includes)))
+
+     (should (semantic-tag-similar-p
+              (semantic-tag "Ns\\SubNs\\SomeClass" 'include)
+              (nth 2 includes)))
      )
    )
   )

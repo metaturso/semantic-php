@@ -3,7 +3,7 @@
 ;; Copyright (C) 2016 Andrea Turso
 
 ;; Author: Andrea Turso <andreaturso@proxima.local>
-;; Created: 2016-03-20 19:52:35+0000
+;; Created: 2016-03-23 23:58:12+0000
 ;; Keywords: syntax
 ;; X-RCS: $Id$
 
@@ -140,6 +140,8 @@
        nil
        (grammar
 	((namespace_declaration))
+	((global_namespace)))
+       (global_namespace
 	((use_declaration))
 	((class_declaration))
 	((function_declaration))
@@ -169,23 +171,19 @@
 	 (cons "number" $2)))
        (namespace_declaration
 	((T_NAMESPACE qualified_name namespace_body)
-	 (let
-	     ((namespace
-	       (wisent-raw-tag
-		(semantic-tag-new-type $2 "namespace" nil nil)))
-	      members)
-	   (dolist
-	       (tag $3 members)
-	     (unless
-		 (memq
-		  (semantic-tag-class tag)
-		  '(include using namespace alias))
-	       (semantic-tag-put-attribute tag :namespace $2))
-	     (setq members
-		   (cons tag members)))
-	   (semantic-tag-put-attribute namespace :members
-				       (nreverse members))
-	   namespace)))
+	 (wisent-raw-tag
+	  (semantic-tag-new-type $2 "namespace"
+				 (let
+				     ((result $3))
+				   (dolist
+				       (tag result result)
+				     (unless
+					 (memq
+					  (semantic-tag-class tag)
+					  '(include using namespace alias))
+				       (semantic-tag-put-attribute tag :namespace $2)))
+				   result)
+				 nil))))
        (namespace_body
 	((S_NS_SCOPE)
 	 (if $region1
@@ -211,16 +209,22 @@
        (use_declaration
 	((T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON)
 	 (wisent-raw-tag
-	  (semantic-tag $5 'using :type
+	  (semantic-tag $3 'using :type
 			(wisent-raw-tag
-			 (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t)))))
+			 (semantic-tag-new-type $5 $2
+						(list
+						 (wisent-raw-tag
+						  (semantic-tag-new-type $3 $2 nil nil)))
+						nil :kind 'alias :prototype t)))))
 	((T_USE use_type qualified_name T_SEMICOLON)
 	 (wisent-raw-tag
-	  (semantic-tag
-	   (semantic-php-name-nonnamespace $3)
-	   'using :type
-	   (wisent-raw-tag
-	    (semantic-tag-new-type $3 $2 nil nil :kind 'alias :prototype t))))))
+	  (semantic-tag $3 'using :type
+			(wisent-raw-tag
+			 (semantic-tag-new-type $3 $2
+						(list
+						 (wisent-raw-tag
+						  (semantic-tag-new-type $3 $2 nil nil)))
+						nil :kind 'alias :prototype t))))))
        (const_declaration
 	((T_CONST T_STRING const_initialiser)
 	 (wisent-raw-tag
@@ -347,6 +351,10 @@
 	((T_FUNCTION T_STRING formal_parameter_list)
 	 (cons $2 $3)))
        (method_opt
+	((T_ABSTRACT static_or_access_modifiers)
+	 (cons "abstract" $2))
+	((static_or_access_modifiers T_ABSTRACT)
+	 (cons "abstract" $1))
 	((static_or_access_modifiers)))
        (function_body
 	((T_SEMICOLON))
@@ -431,9 +439,9 @@
 	 (list $1)))
        (static_or_access_modifiers
 	((T_STATIC access_modifier)
-	 (list $1 $2))
+	 (list "static" $2))
 	((access_modifier T_STATIC)
-	 (list $2 $1))
+	 (list "static" $1))
 	((access_modifier)
 	 (list $1)))
        (interface_declaration
