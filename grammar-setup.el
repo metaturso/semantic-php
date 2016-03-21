@@ -244,36 +244,29 @@ have to be wrapped in that namespace."
 The return value can be a mixed list of either strings (names of
 types that are in scope) or actual tags (type declared locally
 that may or may not have a name.)"
-  ;; NOTE seems that the original version of this function should
-  ;; handle nested definitions. See semantic-ctxt-scoped-types c++-mode in c.el
   (if point (goto-char point))
-
   (let* (;; If we're in a namespace (semantic-php--guess-current-ns)
          ;; will return a partially qualified name, or "\\" if we're
          ;; in the global namespace.
          ;;
          ;; TODO handle the global namespace.
          (currentns (semantic-php--guess-current-ns))
+         (tagstable (or currentns (current-buffer)))
          returntags)
 
     ;; 1. all types declared in namespaces within this buffer.
-    (setq tmp (semantic-find-tags-by-class 'type (current-buffer)))
+    (setq tmp (semantic-find-tags-by-class 'type tagstable))
     (setq tmp (semantic-find-tags-by-type "namespace" tmp))
     (setq returntags tmp)
     ;; (message "semantic-ctxt-scoped-types: namespaces in this file [%s]" tmp)
 
-    ;; 2. ll types imported and aliased with using.
-    (setq tmp (semantic-find-tags-by-class 'using (semantic-flatten-tags-table currentns)))
+    ;; 2. Types imported and aliased with using.
+    (setq tmp (semantic-find-tags-by-class 'using (semantic-flatten-tags-table tagstable)))
     (setq returntags
           (append returntags
                   (mapcar 'semantic-tag-type tmp)))
 
     ;; (message "semantic-ctxt-scoped-types: types imported in this file [%s]" (mapcar 'semantic-tag-type tmp))
-
-    ;; 2. all types implicitly imported
-    ;;
-    ;; a) types in the same namespace
-    ;; b) types in imported namespace
     returntags))
 
 (define-mode-local-override semantic-analyze-dereference-metatype php-mode
