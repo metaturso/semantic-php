@@ -123,8 +123,11 @@ TABLE is a tag table.  See `semantic-something-to-tag-table'."
   This allows Semantic to known about symbols used in this buffer
   and defined in a different file."
   (let ((class-name (semantic-tag-name tag)))
-    (if (and (featurep 'ede-php-autoload) (ede-current-project))
-        (let ((file-name (ede-php-autoload-find-class-def-file (ede-current-project) class-name)))
+    (if (and (featurep 'ede-php-autoload)
+             (ede-current-project))
+        (let ((file-name (ede-php-autoload-find-class-def-file
+                          (ede-current-project)
+                          class-name)))
           (if file-name
               file-name
             class-name))
@@ -175,7 +178,8 @@ TABLE is optional if INCLUDETAG has an overlay of :filename attribute."
   ;; match the current namespace? If yes we might be able to find our
   ;; way around the file system without knowing anything else, elthough
   ;; we should rely on ede.
-  (if (and (featurep 'ede-php-autoload) (ede-current-project))
+  (if (and (featurep 'ede-php-autoload)
+           (ede-current-project))
       (let ((file-name
              (ede-php-autoload-find-class-def-file
               (ede-current-project)
@@ -254,6 +258,8 @@ that may or may not have a name.)"
          (tagstable (or currentns (current-buffer)))
          returntags)
 
+    ;; (message "current ns [%s], if nil we're using entire buffer" currentns)
+
     ;; 1. Types declared in namespaces within this buffer.
     (setq tmp (semantic-find-tags-by-class 'type tagstable))
     (setq tmp (semantic-find-tags-by-type "namespace" tmp))
@@ -277,18 +283,18 @@ that may or may not have a name.)"
     ;; >>> NOTE FIXME TODO NEXT <<<
     ;; Apparently classes with an empty body aren't showing up
     ;; in the result. Trying to figure this out.
-    (message "classes")
 
-    ;; a) classes, interfaces, and traits
-    (setq returntags
-          (append returntags
-                  (semantic-find-tags-by-type "class" tmp)))
+    (let (classes functions)
+      ;; a) classes, interfaces, and traits
+      (setq classes (semantic-find-tags-by-type "class" tmp))
+      ;; (message "semantic-ctxt-scoped-types: classes declared in this file [%s]" classes)
+      (setq returntags (append returntags classes))
 
-    ;; b) functions
-    (setq returntags
-          (append returntags
-                  (semantic-find-tags-by-class 'function tagstable)))
-
+      ;; b) functions
+      (setq functions (semantic-find-tags-by-class 'function tagstable))
+      ;; (message "semantic-ctxt-scoped-types: functions declared in this file [%s]" functions)
+      (setq returntags (append returntags functions))
+      )
     returntags))
 
 (define-mode-local-override semantic-analyze-dereference-metatype php-mode
@@ -308,6 +314,7 @@ SCOPE is the scope object with additional items in which to search for names."
   ;; NOTE this entire dereference list logic isn't needed
   ;; and I'm only using to test multiple dereferencers.
   ;; This function could use heavy simplification.
+  (message "semantic-analyze-dereference-metatype: derefercing loop start")
   (let* ((dereferencer-list '(semantic-php-dereference-metatype))
          (dereferencer (pop dereferencer-list))
          (type-tuple)
@@ -570,7 +577,7 @@ will produce the following tags:
          ;; Produce a new `include' tag to hint Semantic of the external
          ;; dependency.
          (include-tag (semantic-tag-new-include fq-type-name nil)))
-    (message "Expanded using [%s => %s]" local-type-name fq-type-name)
+    ;; (message "Expanded using [%s => %s]" local-type-name fq-type-name)
     (semantic-tag-set-bounds include-tag (semantic-tag-start using-tag) (semantic-tag-end using-tag))
     (list using-tag include-tag alias-tag)))
 
@@ -653,7 +660,8 @@ point is in the global namespace."
    ;; navigation inside 'type children
    (setq senator-step-at-tag-classes '(function variable type))
 
-   (when (and (featurep 'ede-php-autoload) (ede-current-project))
+   (when (and (featurep 'ede-php-autoload)
+              (ede-current-project))
      (semantic-add-system-include (ede-php-autoload-project-root)))
 
    (semantic-mode 1))

@@ -95,6 +95,8 @@
 %start interface_member_declaration
 
 ;; reparse nonterminals
+%start class_declaration
+%start namespace_declaration
 
 ;; local_variables is used instead of bovine-inner-scope to extract
 ;; tags from blocks of code.

@@ -1,1 +1,3 @@
+#!/usr/bin/env bash
 emacs -q --script tests/run.el
+# emacs -q -l tests/run.el

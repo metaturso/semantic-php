@@ -7,6 +7,7 @@ BODY has access to the following variables:
 "
   `(with-temp-buffer
      (insert-file-contents (concat semantic-php-fixture-directory ,fixture-file))
+     (set-visited-file-name (concat semantic-php-fixture-directory ,fixture-file) t nil)
      (goto-char 0)
      (php-mode)
      (semantic-clear-toplevel-cache)

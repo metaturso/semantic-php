@@ -34,21 +34,19 @@
 (ert-deftest semantic-php-test-class-methods-from-parent nil
   "Test that we can access public and protected methods from the
 parent class."
-  (with-php-buffer
-   (concat
-    "class ParentClass { public function stuff() {} }"
-    "class ChildClass extends ParentClass { private $figureThisOut; }"
-    ;; ^^^ NOTE FIXME TODO NEXT: why are classes with empty body not
-    ;; showing up in (semantic-find-tags-by-class 'type (current-buffer))?
-    "function test() {"
-    "  $child = new ChildClass();"
-    "  $child->"
-    "}")
+  (with-php-file
+   "class-inheritance.php"
    (search-forward "->")
-   ;; (let* ((scopetypes (semantic-analyze-scoped-types (point)))
-   ;;        (parents (semantic-analyze-scope-nested-tags (point) scopetypes)))
-   ;;   (pp scopetypes))
-   (semantic-complete-analyze-inline)
+   (let* ((completions (mapcar 'semantic-tag-name (semantic-analyze-possible-completions (point))))
+          (scopetypes (semantic-analyze-scoped-types (point)))
+          (parents (semantic-analyze-scope-nested-tags (point) scopetypes)))
+
+     (should (member "ChildClass" (mapcar 'semantic-tag-name scopetypes)))
+     (should (member "ParentClass" (mapcar 'semantic-tag-name scopetypes)))
+
+     (should (member "childPublic" completions))
+     (should (member "parentPublic" completions))
+     )
    ;; (message "%s" (semantic-analyze-scope-lineage-tags-php-mode (list (nth 1 buffer-tags)) nil))
    )
   )
