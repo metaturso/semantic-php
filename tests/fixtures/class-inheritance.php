@@ -4,26 +4,26 @@ class ParentClass
 {
     const PARENT_CONST = 1;
 
-    public $parentPublic;
-    private $parentPrivate;
-    protected $parentProtected;
+    public $parentPublicAttr;
+    private $parentPrivateAttr;
+    protected $parentProtectedAttr;
 
-    public function parentPublic() {}
-    private function parentPrivate() {}
-    protected function parentProtected() {}
+    public function parentPublicMth() {}
+    private function parentPrivateMth() {}
+    protected function parentProtectedMth() {}
 }
 
 class ChildClass extends ParentClass
 {
     const CHILD_CONST = 1;
 
-    public $childPublic;
-    private $childPrivate;
-    protected $childProtected;
+    public $childPublicAttr;
+    private $childPrivateAttr;
+    protected $childProtectedAttr;
 
-    public function childPublic() {}
-    private function childPrivate() {}
-    protected function childProtected() {}
+    public function childPublicMth() {}
+    private function childPrivateMth() {}
+    protected function childProtectedMth() {}
 }
 
 /** TODO local variables in top-level */

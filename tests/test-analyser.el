@@ -44,10 +44,20 @@ parent class."
      (should (member "ChildClass" (mapcar 'semantic-tag-name scopetypes)))
      (should (member "ParentClass" (mapcar 'semantic-tag-name scopetypes)))
 
-     (should (member "childPublic" completions))
-     (should (member "parentPublic" completions))
+     (should (member "childPublicAttr" completions))
+     (should (member "childPublicMth" completions))
+
+     (should (member "parentPublicAttr" completions))
+     (should (member "parentPublicMth" completions))
      )
-   ;; (message "%s" (semantic-analyze-scope-lineage-tags-php-mode (list (nth 1 buffer-tags)) nil))
+   )
+  )
+
+(ert-deftest semantic-php-scoped-types-same-ns nil
+  (with-php-file
+   "Ns/ChildClass.php"
+   (search-forward "{")
+   (semantic-ctxt-scoped-types)
    )
   )
 

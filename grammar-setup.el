@@ -249,52 +249,78 @@ The return value can be a mixed list of either strings (names of
 types that are in scope) or actual tags (type declared locally
 that may or may not have a name.)"
   (if point (goto-char point))
-  (let* (;; If we're in a namespace (semantic-php--guess-current-ns)
-         ;; will return a partially qualified name, or "\\" if we're
-         ;; in the global namespace.
-         ;;
-         ;; TODO handle the global namespace.
-         (currentns (semantic-php--guess-current-ns))
-         (tagstable (or currentns (current-buffer)))
-         returntags)
+  (let*  ((currentns (semantic-php--guess-current-ns))
+          (table (or currentns (current-buffer)))
+          nstags returntags)
 
-    ;; (message "current ns [%s], if nil we're using entire buffer" currentns)
+    ;; 1a. Classes (including interfaces and traits), functions, and
+    ;; constants defined in the current file.
+    (setq tmp (semantic-find-tags-by-class 'type table))
 
-    ;; 1. Types declared in namespaces within this buffer.
-    (setq tmp (semantic-find-tags-by-class 'type tagstable))
-    (setq tmp (semantic-find-tags-by-type "namespace" tmp))
-    (setq returntags tmp)
-    ;; (message "semantic-ctxt-scoped-types: namespaces in this file [%s]" tmp)
+    ;; Add the namespaces tags found in this buffer to the result,
+    ;; their members will also become available.
+    ;;
+    ;; NOTE: This search will return all types in all namespaces
+    ;; define in a file, if fewer and more accurate results are needed
+    ;; simply limit this result to the dominating namespace.
+    (setq returntags (semantic-find-tags-by-type tmp "namespace"))
+
+    (unless returntags
+      (message "semantic-ctxt-scoped-types: no tags from namespace.")) ;;
+
+    (when (and (semantic-tag-p currentns)
+               (semantic-tag-of-type-p currentns "namespace"))
+      ;; 1b. Sibling classes, functions, constants defined in the same
+      ;; namespace.
+      (message "semantic-ctxt-scoped-types: implicit imports from [%s]..." (car currentns))
+
+      ;; Lookup all namespace declarations in the database, those will
+      ;; contain the type definitions needed.
+      (setq tmp (semanticdb-find-tags-by-name (semantic-tag-name currentns)))
+
+      ;; FIXME iterate to find the right namespace, this code assumes
+      ;; it's always at the top of the list.
+      (setq tmp (car (car tmp)))
+
+      ;; Get the database file relative to the namespace.
+      (setq tmp (oref tmp parent-db))
+
+      ;; Iterate over the tag table of each file in the namespace.
+      (setq tmp (semanticdb-get-database-tables tmp))
+      (while (and (setq nstags (car tmp))
+                  ;; FIXME assuming there's always going to be one namespace per file!
+                  (setq nstags (car-safe (semanticdb-typecache-file-tags nstags))))
+        ;; TODO skip the same file.
+        ;; TODO fixup qualified/unqualified tag name mess.
+        ;;       (setq returntags (append returntags (semantic-tag-type-members siblingtypes)))
+        (message "semantic-ctxt-scoped-types: siblings [%s]." (semantic-tag-type-members nstags))
+        (setq tmp (cdr tmp))
+        )
+      )
 
     ;; 2. Types imported and aliased with using.
-    ;; The tagstable is flattened since using tags are produced
+    ;; The table is flattened since using tags are produced
     ;; inside namespaces as well.
-    (setq tmp (semantic-find-tags-by-class 'using (semantic-flatten-tags-table tagstable)))
+    (message "semantic-ctxt-scoped-types: explicit imports...")
+    (setq tmp (semantic-find-tags-by-class 'using (semantic-flatten-tags-table table)))
     (setq returntags
           (append returntags
                   (mapcar 'semantic-tag-type tmp)))
-    ;; (message "semantic-ctxt-scoped-types: types imported in this file [%s]" (mapcar 'semantic-tag-type tmp))
 
-    ;; 3. Types that may be declared in the global scope.
-    ;; TODO only do this if not in a namespace?
-    ;; a) classes, interfaces, and traits
-    (setq tmp (semantic-find-tags-by-class 'type tagstable))
+    ;; 3. Types in the global scope.
+    (setq tmp (semantic-find-tags-by-class 'type table))
 
-    ;; >>> NOTE FIXME TODO NEXT <<<
-    ;; Apparently classes with an empty body aren't showing up
-    ;; in the result. Trying to figure this out.
+    ;; 3a. classes, interfaces, and traits
+    (setq tmp (semantic-find-tags-by-type "class" tmp))
+    (setq returntags (append returntags tmp))
 
-    (let (classes functions)
-      ;; a) classes, interfaces, and traits
-      (setq classes (semantic-find-tags-by-type "class" tmp))
-      ;; (message "semantic-ctxt-scoped-types: classes declared in this file [%s]" classes)
-      (setq returntags (append returntags classes))
+    ;; 3b. functions
+    (setq tmp (semantic-find-tags-by-class 'function table))
+    (setq returntags (append returntags tmp))
 
-      ;; b) functions
-      (setq functions (semantic-find-tags-by-class 'function tagstable))
-      ;; (message "semantic-ctxt-scoped-types: functions declared in this file [%s]" functions)
-      (setq returntags (append returntags functions))
-      )
+    (message "semantic-ctxt-scoped-types: types in scope [%s]."
+             (mapcar 'semantic-tag-name (semantic-flatten-tags-table returntags)))
+
     returntags))
 
 (define-mode-local-override semantic-analyze-dereference-metatype php-mode
@@ -615,15 +641,13 @@ will produce the following tags:
 Returns the namespace tag, or nil when it's hard to guess or the
 point is in the global namespace."
   (if point (goto-char point))
-  (let ((table (or (semantic-find-tag-by-overlay) (current-buffer)))
+  (let ((table (semantic-find-tag-by-overlay))
         outermost)
-    (when (listp table)
-      (setq outermost (car (cdr (nreverse table)))))
-    (if (and (semantic-tag-p outermost)
-             (equal (semantic-tag-type outermost) "namespace"))
-        outermost
-      (unless (semantic-tag-get-attribute outermost :namespace)
-        outermost))
+    (if (and (semantic-tag-p (car table))
+             (semantic-tag-of-type-p (car table) "namespace"))
+        ;; The first tag in the list is a namespace, we can return
+        ;; this.
+        (setq outermost (car table)))
     outermost))
 
 ;;;###autoload
