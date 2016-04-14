@@ -278,8 +278,8 @@ that may or may not have a name.)"
       ;; contain the type definitions needed.
       (setq tmp (semanticdb-find-tags-by-name (semantic-tag-name currentns)))
 
-      ;; FIXME iterate to find the right namespace, this code assumes
-      ;; it's always at the top of the list.
+      ;; TODO (FIXME?) iterate to find the right namespace, this code
+      ;; assumes it's always at the top of the list.
       (setq tmp (car (car tmp)))
 
       ;; Get the database file relative to the namespace.
@@ -291,10 +291,25 @@ that may or may not have a name.)"
                   ;; FIXME assuming there's always going to be one namespace per file!
                   (setq nstags (car-safe (semanticdb-typecache-file-tags nstags))))
         ;; TODO skip the same file.
-        ;; TODO fixup qualified/unqualified tag name mess.
-        ;;       (setq returntags (append returntags (semantic-tag-type-members siblingtypes)))
-        (message "semantic-ctxt-scoped-types: siblings [%s]." (semantic-tag-type-members nstags))
+        (cond
+         ((semantic-tag-of-type-p nstags "namespace")
+          (pp (semantic-tag-type-members nstags))
+          (setq tmp (semantic-find-tags-by-type 'type (semantic-tag-type-members nstags)))
+          (message "semantic-ctxt-scoped-types: sibling types in ns [%s] [%s]."
+                   (car nstags)
+                   (mapcar 'semantic-tag-name tmp))
+          )
+
+         ((semantic-tag-of-class-p nstags 'type)
+          (message "semantic-ctxt-scoped-types: sibling type [%s]." (car nstags))
+          )
+
+         (t
+          (message "semantic-ctxt-scoped-types: dunno [%s]" (car nstags))
+          )
+         )
         (setq tmp (cdr tmp))
+
         )
       )
 
@@ -340,7 +355,7 @@ SCOPE is the scope object with additional items in which to search for names."
   ;; NOTE this entire dereference list logic isn't needed
   ;; and I'm only using to test multiple dereferencers.
   ;; This function could use heavy simplification.
-  (message "semantic-analyze-dereference-metatype: derefercing loop start")
+  (message "semantic-analyze-dereference-metatype: derefercing loop start [%s]" (car-safe type))
   (let* ((dereferencer-list '(semantic-php-dereference-metatype))
          (dereferencer (pop dereferencer-list))
          (type-tuple)
@@ -389,7 +404,7 @@ but not a use statement."
           ;; Name not qualified at all, or its namespace part is not
           ;; fully qualified (i.e. it does not begin with \\).
           (progn (setq typename (car (last typename)))
-                 ;; (message "Preparing lookup up P_QN [%s] in scope." typename)
+                 (message "Preparing lookup up P_QN [%s] in scope." typename)
                  (setq namespaces (semantic-find-tags-by-class 'type scopetypes))
                  (setq namespaces (remove nil
                                           (mapcar (lambda (ct)

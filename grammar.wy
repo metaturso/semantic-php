@@ -95,6 +95,7 @@
 %start interface_member_declaration
 
 ;; reparse nonterminals
+%start use_declaration
 %start class_declaration
 %start namespace_declaration
 
@@ -196,12 +197,14 @@ namespace_subparts:
 ;; discerned from one another at parse time, and the best place for
 ;; doing this is in `< REMEMBER : insert function here>'
 use_declaration:
-    T_USE use_type qualified_name T_AS T_STRING T_SEMICOLON
-    (TAG $3 'using
-         :type (TYPE-TAG $5 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
-  | T_USE use_type qualified_name T_SEMICOLON
-    (TAG $3 'using
-         :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+    T_USE use_type qualified_name T_AS T_STRING
+    (prog1 (TAG $3 'using
+                :type (TYPE-TAG $5 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+      (message "use %s" $2 $3))
+  | T_USE use_type qualified_name
+    (prog1 (TAG $3 'using
+                :type (TYPE-TAG $3 $2 (list (TYPE-TAG $3 $2 nil nil)) nil :kind 'alias :prototype t))
+      (message "use %s %s" $2 $3))
   ;
 
 const_declaration:
@@ -243,12 +246,14 @@ class_opt: ;; EMPTY
 
 extends_opt: ;;EMPTY
            | T_EXTENDS qualified_name
-             (identity $2)
+             (TAG $2 'metatype)
            ;
 
 implements_opt: ;;EMPTY
               | T_IMPLEMENTS qualified_name_list
-                (nreverse $2)
+                (mapcar (lambda (interface)
+                          (wisent-raw-tag (semantic-tag interface 'metatype)))
+                        (nreverse $2))
               ;
 
 class_body: BRACE_BLOCK

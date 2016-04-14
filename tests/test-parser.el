@@ -102,13 +102,16 @@ buffer without any namespace."
    (concat
     "class Date implements \\DateTimeImmutable {}"
     "class ClassName implements FirstIface, Ns\\SecondIface {}")
+   (let ((date-implements (semantic-tag-get-attribute (nth 0 buffer-tags) :interfaces))
+         (class-implements (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces)))
+
    (should (equal "\\DateTimeImmutable"
-                  (nth 0 (semantic-tag-get-attribute (nth 0 buffer-tags) :interfaces))))
+                  (semantic-tag-name (nth 0 date-implements))))
    (should (equal "FirstIface"
-                  (nth 0 (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces))))
+                  (semantic-tag-name(nth 0 class-implements))))
    (should (equal "Ns\\SecondIface"
-                  (nth 1 (semantic-tag-get-attribute (nth 1 buffer-tags) :interfaces))))
-   )
+                  (semantic-tag-name(nth 1 class-implements))))
+   ))
   )
 
 (ert-deftest semantic-php-test-parser-class-methods-protection nil
