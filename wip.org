@@ -1,0 +1,183 @@
+* TODO
+** <2016-03-28> [7] Write a dereferencer for types in the same ns
+I'm augmenting the function semantic-ctxt-scoped-types to search and
+return sibling tags, i.e. tags in the same namespace.
+
+For example a file ChildClass.php in Ns:
+
+namespace Ns; class ChildClass extends ParentClass {}
+
+will be able to load ParentClass.php in Ns.
+
+Option A: producing include for extends, implements.
+The parser/expand function can be changed to produce include tags for this scenario.
+con: working with names in the expansion function.
+con: creates duplicate includes.
+con: scope types become include-dependant, now they are using centered.
+
+Option B: scoped types same-ns
+The semantic-ctxt-scoped-types function is capable of finding tags in the same
+namespace as we are currently in.
+
+Option C: same-ns dereferencer
+A type dereferencer which searches inside the same namespace
+
+A combination of option B and C seem to be the way to go, and I've already
+started experimenting the former with positive results.
+
+BEWARE THO: the dereferencer makes use of the function
+semantic-ctxt-scoped-types, so don't go crazy with the computation,
+since option C is becoming increasingly likely to be the preferred
+implementation. Either way, the process of moving the functionality
+to a dereferencer shouldn't be tough.
+Don't forget there are places where I can, and I ought to, use the cache.
+
+#+BEGIN_SRC
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+semantic-ctxt-scoped-types: no tags from namespace.
+semantic-ctxt-scoped-types: implicit imports from [Officine\Amaka\AmakaScript]...
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+semantic-ctxt-scoped-types: no tags from namespace.
+semantic-ctxt-scoped-types: implicit imports from [Officine\Amaka\AmakaScript]...
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+semantic-ctxt-scoped-types: no tags from namespace.
+semantic-ctxt-scoped-types: implicit imports from [Officine\Amaka\AmakaScript]...
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+semantic-analyze-dereference-metatype: derefercing loop start
+semantic-ctxt-scoped-types: no tags from namespace.
+semantic-ctxt-scoped-types: implicit imports from [Officine\Amaka\AmakaScript]...
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+semantic-ctxt-scoped-types: no tags from namespace.
+semantic-ctxt-scoped-types: implicit imports from [Officine\Amaka\AmakaScript]...
+semantic-ctxt-scoped-types: sibling types in ns [Officine\Amaka\AmakaScript] [nil].
+semantic-ctxt-scoped-types: explicit imports...
+semantic-ctxt-scoped-types: types in scope [nil].
+#+END_SRC
+
+** <2016-04-06> [8] Find out where semantic-ia-fast-jump is bound
+* BUGS
+** <2016-04-06> [9] Fix jumps to using/includes and go to definition
+** <2016-04-06> [10] Fix prototypes I: autocomplete
+   Autocompleting a method should insert the parenthesis
+   but not all the prototype rubbish, especially for mixed/*empty*
+   types.
+** <2016-04-06> [11] Fix type of parent constant
+** <2016-04-06> [12] Cleanup ecb methods window
+   - [ ] Remove method-prototypes bucket
+   - [ ] Format imports once as Local Name/Alias: FQN
+** <2016-03-27> [6] Variable type analysis doesn't work in global scope
+   It works in functions and methods, does it work in namespaces?
+   It surely doesn't work in the global namespace.
+** <2016-03-27> [5] Type analysis doesn't work when buffer is not saved
+
+   When autocomplete is attempted with the following buffer, the analysis
+   doesn't work unless the buffer is a file.
+
+   #+BEGIN_SRC php
+   <?php
+   class ParentClass { public function foo() {} }
+   class ChildClass extends ParentClass {}
+   function fun() {
+       $child = new ChildClass();
+       $child->
+   }
+   #+END_SRC
+
+   semantic is not calling the current context function when the
+   buffer is not saved.
+
+** <2016-03-20> [1] Using tags experiment                             :FIXED:
+   Reintroduce the structure of using tags used in c.by, in other words:
+   using has got FQN (the name of the imported symbol)
+   the type of this symbol is the alias
+   the member of the alias is the fully qualified name
+
+   Fix all the function that depended on the structure of using tags.
+** <2016-03-25> [2] Classes with empty body not in scoped types
+*** DESCRIPTION
+    class Empty {}
+    isn't showing up in semantic-analyze-scoped-types, the class
+    is being parsed as the bovinate output shows.
+
+    #+BEGIN_SRC php
+    <?php
+    class ParentClass { public function foo() {} }
+    class ChildClass extends ParentClass {}
+    function fun() {
+        $child = new ChildClass();
+        $child->
+    }
+    #+END_SRC
+
+    #+BEGIN_SRC elisp
+    ;; (bovinate) result
+    (("ParentClass" type
+      (:members
+       (("foo" function
+         (:typemodifiers
+          ("public")
+          :type "mixed")
+         (reparse-symbol class_member_declaration)
+         #<overlay from 28 to 52 in test.php>))
+       :type "class")
+      nil #<overlay from 8 to 54 in test.php>)
+     ("ChildClass" type
+      (:superclasses "ParentClass" :type "class")
+      nil #<overlay from 55 to 94 in test.php>))
+    #+END_SRC :analyser: :scope:
+
+    Evaluating ~(and (goto-char 0) (search-forward "->") (semantic-analyze-scoped-types (point)))~
+    started reporting ChildClass in today's version of semantic-php.
+
+    I think the problem is caused by the incorrect deference of the ChildClass type.
+
+    Executing the command ~semantic-analyze-debug-assist~ causes the following backtrace:
+
+    #+BEGIN_SRC
+    Debugger entered--Lisp error: (wrong-type-argument (or eieio-object-p class-p) nil)
+      signal(wrong-type-argument ((or eieio-object-p class-p) nil))
+      eieio-oref(nil parents)
+      semantic-analyzer-debug-describe-scope([object semantic-analyze-context "context" (172 . 172) ("$child" "") (function variable type) nil nil #<buffer test.php> nil])
+      semantic-analyzer-debug-global-symbol([object semantic-analyze-context "context" (172 . 172) ("$child" "") (function variable type) nil nil #<buffer test.php> nil] "$child" nil)
+      semantic-analyzer-debug-found-prefix([object semantic-analyze-context "context" (172 . 172) ("$child" "") (function variable type) nil nil #<buffer test.php> nil])
+      semantic-analyze-debug-assist()
+      call-interactively(semantic-analyze-debug-assist record nil)
+      command-execute(semantic-analyze-debug-assist record)
+      helm-M-x(nil "semantic-analyze-debug-assist")
+      call-interactively(helm-M-x nil nil)
+      command-execute(helm-M-x)
+    #+END_SRC
+
+** <2016-03-20> [3] Locate incremental parse error and arrayp issues
+   These two error messages seem to be related, they happen both on
+   Emacs 24 and 25 with PHP buffers of various nature. Not sure as
+   to what's causing this and how to track the error down, but I do
+   have a feeling that's related to the parsing of elements in the
+   global namespace.
+
+   Apparently it's due the inverted bounds for the following:
+   use PHPUnit_Framework_TestCase as TestCase; (8 . 51)
+   is instead (51 . 8).
+
+   After some investigation, and reintroducing the use_declaration
+   to the set of start symbols to allow incremental reparsing (NO SHIT!)
+   the error seem to have gone away.
+
+** <2016-03-25> [4] Inconsistencies with block lexing
+   In cpp mode block tokens start and end with the braces, in php however
+   things have gotten weird since the beginning of the project, and now
+   block tokens aren't being handled properly.
+
+   In particular, blocks are being incorrectly represented as two tokens
+   starting and ending around the braces, and all the stuff that's in them
+   is simply being sandwiched in the token stream.

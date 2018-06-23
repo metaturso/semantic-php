@@ -1,7 +1,8 @@
 (require 'semantic/wisent/grammar)
 
 (defun grammar-macro-NAMESPACE (name body)
-  "Create a namespace NAME containg the tags in BODY"
+  "Create a new namespace tag with NAME with BODY.
+All tags in BODY gets their :namespace attribute set to NAME."
   `(wisent-raw-tag
     (semantic-tag-new-type
      ,name
